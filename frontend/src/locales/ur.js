@@ -473,10 +473,6 @@ const ur = {
   startTime: 'شروع کا وقت',
   endTime: 'اختتام کا وقت',
   day: 'دن',
-  timetableView: 'ٹائم ٹیبل دیکھیں',
-  createTimetable: 'ٹائم ٹیبل بنائیں',
-  timetableDesigner: 'ٹائم ٹیبل ڈیزائنر',
-  allClassesTimetable: 'تمام کلاسز کا ٹائم ٹیبل',
 
   event: 'تقریب',
   holiday: 'چھٹی',

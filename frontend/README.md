@@ -206,7 +206,7 @@ There is no `Loader.jsx` or `Spinner.jsx` component in the project.
 | Context | File | Purpose | Used By |
 |---------|------|---------|---------|
 | `AuthContext` | `frontend/src/contexts/AuthContext.jsx` | Authentication state (`user`, `role`, `loading`), login/logout functions | `ProtectedRoute.jsx`, `Login.jsx`, `AdminDropdown.jsx`, `TeacherDashboard.jsx`, `StudentDashboard.jsx`, `App.jsx` |
-| `SchoolConfigContext` | `frontend/src/contexts/SchoolConfigContext.jsx` | Global school configuration (`schoolInfo`, `academic`, `branding`, `preferences`), `refresh()` | `QRCodeManagement.jsx`, `TimetableDesigner.jsx`, `SchoolSettings.jsx`, `App.jsx` |
+| `SchoolConfigContext` | `frontend/src/contexts/SchoolConfigContext.jsx` | Global school configuration (`schoolInfo`, `academic`, `branding`, `preferences`), `refresh()` | `QRCodeManagement.jsx`, `SchoolSettings.jsx`, `App.jsx` |
 
 ### Observations
 
@@ -312,7 +312,6 @@ frontend/src/
 │   ├── student/            # Student management components (tabs)
 │   ├── subject/            # Subject management components (tabs)
 │   ├── teacher/            # Teacher management components (tabs)
-│   ├── timetable/          # Timetable management components (tabs)
 │   └── ProtectedRoute.jsx # Route guard component
 ├── contexts/               # React Contexts (AuthContext, SchoolConfigContext)
 ├── hooks/                  # Custom hooks (useSchoolBranding)
@@ -343,8 +342,6 @@ frontend/src/
 3. **Notification system** (`NotificationBell.jsx`) has hardcoded mock data and no API integration.
 
 4. **`useSchoolBranding` hook** (`hooks/useSchoolBranding.js`) duplicates the same API call that `SchoolConfigContext` makes. Both independently fetch school settings. This should be consolidated.
-
-5. **Timetable constants duplication:** `utils/timetableConstants.js` defines `GROUPS` with class lists that overlap with `utils/classNames.js`'s `CLASS_NAMES`. Not exact duplicates, but the class names are repeated.
 
 ### Future Scaling Concerns
 

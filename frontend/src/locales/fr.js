@@ -473,10 +473,6 @@ const fr = {
   startTime: 'Heure de début',
   endTime: 'Heure de fin',
   day: 'Jour',
-  timetableView: 'Voir l\'emploi du temps',
-  createTimetable: 'Créer un emploi du temps',
-  timetableDesigner: 'Concepteur d\'emploi du temps',
-  allClassesTimetable: 'Emploi du temps de toutes les classes',
 
   event: 'Événement',
   holiday: 'Congé',

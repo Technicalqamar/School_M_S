@@ -19,8 +19,9 @@ import markRoutes from './routes/mark.routes.js';
 import examScheduleRoutes from './routes/examSchedule.routes.js';
 import admitCardRoutes from './routes/admitCard.routes.js';
 import resultRoutes from './routes/result.routes.js';
-import timetableRoutes from './routes/timetable.routes.js';
-import timetableDesignRoutes from './routes/timetableDesign.routes.js';
+import timeSlotRoutes from './routes/timeSlot.routes.js';
+import timetableEntryRoutes from './routes/timetableEntry.routes.js';
+import timetableDesignerRoutes from './routes/timetableDesigner.routes.js';
 import schoolSettingsRoutes from './routes/schoolSettings.routes.js';
 import studentAttendanceRoutes from './routes/studentAttendance.routes.js';
 import teacherAttendanceRoutes from './routes/teacherAttendance.routes.js';
@@ -92,9 +93,12 @@ app.use('/api/v1/marks', markRoutes);
 app.use('/api/v1/exam-schedules', examScheduleRoutes);
 app.use('/api/v1/admit-cards', admitCardRoutes);
 app.use('/api/v1/results', resultRoutes);
-app.use('/api/v1/timetables', timetableRoutes);
-app.use('/api/v1/timetable-design', timetableDesignRoutes);
 app.use('/api/v1/school-settings', schoolSettingsRoutes);
+app.use('/api/v1/time-slots', timeSlotRoutes);
+// Designer must be mounted BEFORE the /api/v1/timetable router so the
+// `/designer` path is never caught by that router's `/:id` handler.
+app.use('/api/v1/timetable/designer', timetableDesignerRoutes);
+app.use('/api/v1/timetable', timetableEntryRoutes);
 app.use('/api/v1/student-attendance', studentAttendanceRoutes);
 app.use('/api/v1/teacher-attendance', teacherAttendanceRoutes);
 app.use('/api/v1/attendance', attendanceRoutes);

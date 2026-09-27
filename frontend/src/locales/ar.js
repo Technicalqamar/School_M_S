@@ -473,10 +473,6 @@ const ar = {
   startTime: 'وقت البداية',
   endTime: 'وقت النهاية',
   day: 'اليوم',
-  timetableView: 'عرض الجدول',
-  createTimetable: 'إنشاء جدول',
-  timetableDesigner: 'مصمم الجدول',
-  allClassesTimetable: 'جدول جميع الفصول',
 
   event: 'فعالية',
   holiday: 'عطلة',

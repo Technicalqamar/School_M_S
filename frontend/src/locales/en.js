@@ -508,10 +508,6 @@ const en = {
   startTime: 'Start Time',
   endTime: 'End Time',
   day: 'Day',
-  timetableView: 'View Timetable',
-  createTimetable: 'Create Timetable',
-  timetableDesigner: 'Timetable Designer',
-  allClassesTimetable: 'All Classes Timetable',
 
   // Event / Holiday
   event: 'Event',
