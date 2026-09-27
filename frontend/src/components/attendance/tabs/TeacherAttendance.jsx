@@ -17,6 +17,8 @@ import Spinner from '../../common/Spinner/Spinner';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 import teacherAttendanceService from '../../../services/teacherAttendance/teacherAttendance.service';
 import qrAttendanceService from '../../../services/qrAttendanceService/qrAttendanceService';
+import { getImageUrl } from '../../../utils/imageUrl';
+import UsbQrScanner from './UsbQrScanner';
 
 const STATUS_OPTIONS = ['Present', 'Absent', 'Leave', 'Late'];
 const ATTENDANCE_MODES = ['Manual Attendance', 'QR Scanner'];
@@ -89,6 +91,9 @@ const TeacherAttendance = () => {
   const qrScannerRef = useRef(null);
   const isProcessingScanRef = useRef(false);
   const lastScannedQrRef = useRef('');
+  const scanSourceRef = useRef('camera');
+  const [usbActive, setUsbActive] = useState(false);
+  const [usbResult, setUsbResult] = useState(null);
   const scannerElementId = 'teacher-attendance-qr-reader';
 
   const isScannerMode = attendanceMode === 'QR Scanner';
@@ -467,6 +472,26 @@ const TeacherAttendance = () => {
     setScannerStarting(false);
   }, []);
 
+  const markUsbResult = useCallback((descriptor) => {
+    if (scanSourceRef.current === 'usb') setUsbResult(descriptor);
+  }, []);
+
+  const startUsbScanner = useCallback(async () => {
+    if (!academicYear) {
+      toast.error('Please select Academic Year before starting the USB scanner.');
+      return;
+    }
+    // USB mode never requests camera access — release any active camera first.
+    await stopQrScanner();
+    setUsbActive(true);
+    setUsbResult(null);
+  }, [academicYear, stopQrScanner]);
+
+  const stopUsbScanner = useCallback(async () => {
+    setUsbActive(false);
+    setUsbResult(null);
+  }, []);
+
   const processScannedQr = useCallback(async (qrValue) => {
     const normalizedQrValue = typeof qrValue === 'string' ? qrValue.trim() : '';
     if (!normalizedQrValue || isProcessingScanRef.current) return;
@@ -512,6 +537,22 @@ const TeacherAttendance = () => {
             },
           }));
         }
+        markUsbResult({
+          ok: true,
+          type: 'teacher',
+          person: {
+            fullName: teacher.fullName || '',
+            id: teacher.teacherId || '',
+            className: '',
+            image: matchedTeacher?.teacherImage ? getImageUrl(matchedTeacher.teacherImage) : null,
+          },
+          status: result?.status || 'Present',
+          checkIn: result?.checkIn ? formatExactTime(result.checkIn) : '',
+          checkInRaw: result?.checkIn || '',
+          checkOut: result?.checkOut ? formatExactTime(result.checkOut) : '',
+          checkOutRaw: result?.checkOut || '',
+          action: result?.action === 'checkout' ? 'checkout' : 'checkin',
+        });
         return;
       }
 
@@ -522,6 +563,22 @@ const TeacherAttendance = () => {
         setScannerMessage(successMessage);
         setScannerMessageType('success');
         toast.success(successMessage);
+        markUsbResult({
+          ok: true,
+          type: 'student',
+          person: {
+            fullName: student.fullName || '',
+            id: student.studentId || '',
+            className: student.class || '',
+            image: null,
+          },
+          status: result?.status || 'Present',
+          checkIn: result?.checkIn ? formatExactTime(result.checkIn) : '',
+          checkInRaw: result?.checkIn || '',
+          checkOut: '',
+          checkOutRaw: '',
+          action: 'checkin',
+        });
       }
     } catch (error) {
       const rawMessage = error?.response?.data?.message || error?.message || 'QR scan failed.';
@@ -529,17 +586,21 @@ const TeacherAttendance = () => {
       setScannerMessage(message);
       setScannerMessageType('error');
       toast.error(message);
+      markUsbResult({ ok: false, message });
     } finally {
       isProcessingScanRef.current = false;
       lastScannedQrRef.current = '';
     }
-  }, [academicYear, date, formatExactTime, teachers]);
+  }, [academicYear, date, formatExactTime, markUsbResult, teachers]);
 
   const startQrScanner = useCallback(async () => {
     if (!academicYear) {
       toast.error('Please select Academic Year before starting the QR scanner.');
       return;
     }
+
+    // Switching to the camera scanner cleanly ends USB input mode.
+    if (usbActive) stopUsbScanner();
 
     if (qrScannerRef.current) {
       setScannerStarted(true);
@@ -610,7 +671,7 @@ const TeacherAttendance = () => {
     } finally {
       setScannerStarting(false);
     }
-  }, [academicYear, processScannedQr]);
+  }, [academicYear, processScannedQr, stopUsbScanner, usbActive]);
 
   useEffect(() => {
     if (!isScannerMode) {
@@ -622,8 +683,9 @@ const TeacherAttendance = () => {
 
     return () => {
       stopQrScanner();
+      stopUsbScanner();
     };
-  }, [isScannerMode, stopQrScanner]);
+  }, [isScannerMode, stopQrScanner, stopUsbScanner]);
 
   const renderTable = () => (
     <>
@@ -882,7 +944,7 @@ const TeacherAttendance = () => {
               disabled={scannerStarting || scannerStarted}
               className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
-              {scannerStarting ? 'Starting...' : scannerStarted ? 'Scanner Active' : 'Start Scanner'}
+              {scannerStarting ? 'Starting...' : scannerStarted ? 'Scanner Active' : 'Start Camera Scanner'}
             </button>
           </div>
 
@@ -895,6 +957,17 @@ const TeacherAttendance = () => {
               {scannerMessage}
             </div>
           )}
+
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <UsbQrScanner
+              active={usbActive}
+              disabled={!academicYear}
+              onActivate={startUsbScanner}
+              onDeactivate={stopUsbScanner}
+              onScan={(value) => { scanSourceRef.current = 'usb'; processScannedQr(value); }}
+              result={usbResult}
+            />
+          </div>
         </div>
       )}
 

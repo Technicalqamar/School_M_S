@@ -14,6 +14,7 @@ const en = {
   eventsAndHolidays: 'Events & Holidays',
   examinationManagement: 'Examination Management',
   feeManagement: 'Fee Management',
+  salaryPayrollManagement: 'Salary Management',
   feeManagementSubtitle: 'Manage fee structures, collections, receipts and reports',
   feeStructure: 'Fee Structure',
   collectFee: 'Collect Fee',

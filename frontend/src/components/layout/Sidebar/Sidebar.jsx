@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, Bars3Icon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, Bars3Icon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
@@ -308,6 +308,26 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   <DocumentCheckIcon className="h-5 w-5 flex-shrink-0" />
                 </NavLink>
               )}
+            </li>
+            <li className="flex justify-center">
+              <NavLink
+                to="/admin/payroll"
+                className={({ isActive }) =>
+                  `flex items-center transition-all duration-200 rounded-lg ${
+                    isActive
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400'
+                  } ${isOpen ? 'px-3 py-2.5 gap-3 w-[calc(100%-16px)]' : 'w-10 h-10 justify-center'}`
+                }
+                onClick={() => {
+                  if (window.innerWidth < 768) toggleSidebar();
+                }}
+              >
+                <BanknotesIcon className="h-5 w-5 flex-shrink-0" />
+                {isOpen && (
+                  <span className="text-sm font-medium whitespace-nowrap">{t('salaryPayrollManagement')}</span>
+                )}
+              </NavLink>
             </li>
             <li className="flex justify-center">
               {isOpen ? (

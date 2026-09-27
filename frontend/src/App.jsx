@@ -40,6 +40,7 @@ import SubjectManagement from './pages/admin/SubjectManagement';
 import TimetableManagement from './pages/admin/TimetableManagement';
 import AttendanceManagement from './pages/admin/AttendanceManagement';
 import EventsHolidays from './pages/admin/EventsHolidays';
+import PayrollManagement from './pages/admin/PayrollManagement/PayrollManagement';
 import FeeStructurePage from './pages/admin/FeeManagement/FeeStructure';
 import CollectFeePage from './pages/admin/FeeManagement/CollectFee';
 import StudentFeeDetailsPage from './pages/admin/FeeManagement/StudentFeeDetails';
@@ -116,6 +117,7 @@ function AppContent() {
             <Route path="timetable" element={<TimetableManagement />} />
             <Route path="attendance" element={<AttendanceManagement />} />
             <Route path="events" element={<EventsHolidays />} />
+            <Route path="payroll" element={<PayrollManagement />} />
             <Route path="fees/fee-structure" element={<FeeStructurePage />} />
             <Route path="fees/collect-fee" element={<CollectFeePage />} />
             <Route path="fees/student-fee-details" element={<StudentFeeDetailsPage />} />
