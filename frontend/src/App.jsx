@@ -27,7 +27,7 @@ import StudentAssignmentDetail from './pages/student/StudentAssignmentDetail';
 import StudentFees from './pages/student/StudentFees';
 import StudentClassSchedule from './pages/student/StudentClassSchedule';
 import StudentAttendance from './pages/student/StudentAttendance';
-import StudentModulePlaceholder from './pages/student/StudentModulePlaceholder';
+import StudentExamination from './pages/student/StudentExamination';
 import PortalAccess from './pages/portal/PortalAccess';
 import PortalDashboard from './pages/portal/PortalDashboard';
 import AdminLayout from './layouts/AdminLayout';
@@ -157,7 +157,7 @@ function AppContent() {
             <Route path="homework" element={<StudentHomework />} />
             <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
             <Route path="fees" element={<StudentFees />} />
-            <Route path="examination" element={<StudentModulePlaceholder module="examination" />} />
+            <Route path="examination" element={<StudentExamination />} />
             <Route path="class-schedule" element={<StudentClassSchedule />} />
             <Route path="attendance" element={<StudentAttendance />} />
           </Route>
@@ -168,7 +168,7 @@ function AppContent() {
           <Route path="homework" element={<StudentHomework />} />
           <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
           <Route path="fees" element={<StudentFees />} />
-          <Route path="examination" element={<StudentModulePlaceholder module="examination" />} />
+          <Route path="examination" element={<StudentExamination />} />
           <Route path="class-schedule" element={<StudentClassSchedule />} />
           <Route path="attendance" element={<StudentAttendance />} />
         </Route>
