@@ -47,6 +47,9 @@ import teacherMyResultsRoutes from './routes/teacherMyResults.routes.js';
 import studentDashboardRoutes from './routes/studentDashboard.routes.js';
 import studentHomeworkRoutes from './routes/studentHomework.routes.js';
 import studentFeesRoutes from './routes/studentFees.routes.js';
+import studentClassScheduleRoutes from './routes/studentClassSchedule.routes.js';
+import studentPortalAttendanceRoutes from './routes/studentPortalAttendance.routes.js';
+import studentLeaveRequestRoutes from './routes/studentLeaveRequest.routes.js';
 import portalRoutes from './routes/portal.routes.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 
@@ -123,6 +126,9 @@ app.use('/api/v1/teacher/my-results', teacherMyResultsRoutes);
 app.use('/api/v1/student/dashboard', studentDashboardRoutes);
 app.use('/api/v1/student/homework', studentHomeworkRoutes);
 app.use('/api/v1/student/fees', studentFeesRoutes);
+app.use('/api/v1/student/class-schedule', studentClassScheduleRoutes);
+app.use('/api/v1/student/attendance', studentPortalAttendanceRoutes);
+app.use('/api/v1/student/leave-requests', studentLeaveRequestRoutes);
 app.use('/api/v1/portal', portalRoutes);
 
 // Health check

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, Bars3Icon, HomeIcon, ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, Bars3Icon, HomeIcon, ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
@@ -23,6 +23,7 @@ const StudentSidebar = ({ isOpen, toggleSidebar }) => {
     { to: `${base}/homework`, end: false, label: t('homeworkAssignments'), icon: ClipboardDocumentListIcon },
     { to: `${base}/fees`, end: false, label: t('fees'), icon: BanknotesIcon },
     { to: `${base}/examination`, end: false, label: t('examination'), icon: AcademicCapIcon },
+    { to: `${base}/attendance`, end: false, label: t('attendance'), icon: CheckCircleIcon },
   ];
 
   return (

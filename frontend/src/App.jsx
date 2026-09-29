@@ -25,6 +25,8 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import StudentHomework from './pages/student/StudentHomework';
 import StudentAssignmentDetail from './pages/student/StudentAssignmentDetail';
 import StudentFees from './pages/student/StudentFees';
+import StudentClassSchedule from './pages/student/StudentClassSchedule';
+import StudentAttendance from './pages/student/StudentAttendance';
 import StudentModulePlaceholder from './pages/student/StudentModulePlaceholder';
 import PortalAccess from './pages/portal/PortalAccess';
 import PortalDashboard from './pages/portal/PortalDashboard';
@@ -156,6 +158,8 @@ function AppContent() {
             <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
             <Route path="fees" element={<StudentFees />} />
             <Route path="examination" element={<StudentModulePlaceholder module="examination" />} />
+            <Route path="class-schedule" element={<StudentClassSchedule />} />
+            <Route path="attendance" element={<StudentAttendance />} />
           </Route>
         </Route>
 
@@ -165,6 +169,8 @@ function AppContent() {
           <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
           <Route path="fees" element={<StudentFees />} />
           <Route path="examination" element={<StudentModulePlaceholder module="examination" />} />
+          <Route path="class-schedule" element={<StudentClassSchedule />} />
+          <Route path="attendance" element={<StudentAttendance />} />
         </Route>
 
         <Route path="/" element={<IndexRedirect />} />

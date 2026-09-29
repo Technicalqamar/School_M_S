@@ -121,44 +121,77 @@ const getStudentDashboardData = async (user, context = {}) => {
 
   const academicYear = student.academicYear || (await getCurrentAcademicYear());
 
-  const [classDoc, fee] = await Promise.all([
-    student.class ? Class.findOne({ className: student.class }).select('className academicYear status isDeleted').lean() : Promise.resolve(null),
-    feeOutstandingService.getStudentOutstandingDues(student._id, academicYear),
-  ]);
+  // Each dashboard section resolves independently. A failure in one section
+  // (fee, class, homework or examinations) is contained and reported through
+  // the `errors` map instead of failing the whole dashboard — the student's
+  // real profile + academic year always load.
+  const errors = {};
 
+  // Class lookup (used for id/academic-year metadata and homework scoping).
+  let classDoc = null;
+  try {
+    classDoc = student.class
+      ? await Class.findOne({ className: student.class })
+          .select('className academicYear status isDeleted')
+          .lean()
+      : null;
+  } catch (err) {
+    errors.class = err?.message || 'Failed to resolve class details';
+  }
+
+  // Fee status (real fee architecture — same computation as the fees module).
+  let fee = null;
+  try {
+    fee = await feeOutstandingService.getStudentOutstandingDues(student._id, academicYear);
+  } catch (err) {
+    errors.fee = err?.message || 'Failed to load fee status';
+  }
+
+  // Homework / assignments scoped to the student's class.
   let homework = { total: 0, assignments: [] };
 
   if (classDoc && !classDoc.isDeleted && classDoc.status === 'Active') {
-    const [total, assignments] = await Promise.all([
-      Assignment.countDocuments({ classId: classDoc._id }),
-      Assignment.find({ classId: classDoc._id })
-        .populate({ path: 'subjectId', select: 'subjectName subjectCode' })
-        .populate({ path: 'teacherId', select: 'fullName teacherId' })
-        .sort({ createdAt: -1 })
-        .limit(6)
-        .lean(),
-    ]);
+    try {
+      const [total, assignments] = await Promise.all([
+        Assignment.countDocuments({ classId: classDoc._id }),
+        Assignment.find({ classId: classDoc._id })
+          .populate({ path: 'subjectId', select: 'subjectName subjectCode' })
+          .populate({ path: 'teacherId', select: 'fullName teacherId' })
+          .sort({ createdAt: -1 })
+          .limit(6)
+          .lean(),
+      ]);
 
-    homework = { total, assignments: assignments.map(buildAssignment) };
+      homework = { total, assignments: assignments.map(buildAssignment) };
+    } catch (err) {
+      errors.homework = err?.message || 'Failed to load homework';
+    }
   }
 
+  // Upcoming examinations.
   const now = new Date();
+  let exams = [];
+  let scheduledPapers = 0;
 
-  const [exams, scheduledPapers] = await Promise.all([
-    Exam.find({
-      classes: student.class,
-      academicYear,
-      status: 'Active',
-      endDate: { $gte: now },
-    })
-      .select('name type startDate endDate description')
-      .sort({ startDate: 1 })
-      .limit(6)
-      .lean(),
-    classDoc && !classDoc.isDeleted && classDoc.status === 'Active'
-      ? ExamSchedule.countDocuments({ className: student.class, academicYear, status: 'Active', examDate: { $gte: now } })
-      : Promise.resolve(0),
-  ]);
+  try {
+    [exams, scheduledPapers] = await Promise.all([
+      Exam.find({
+        classes: student.class,
+        academicYear,
+        status: 'Active',
+        endDate: { $gte: now },
+      })
+        .select('name type startDate endDate description')
+        .sort({ startDate: 1 })
+        .limit(6)
+        .lean(),
+      classDoc && !classDoc.isDeleted && classDoc.status === 'Active'
+        ? ExamSchedule.countDocuments({ className: student.class, academicYear, status: 'Active', examDate: { $gte: now } })
+        : Promise.resolve(0),
+    ]);
+  } catch (err) {
+    errors.examinations = err?.message || 'Failed to load examinations';
+  }
 
   return {
     student: buildProfile(student),
@@ -173,6 +206,7 @@ const getStudentDashboardData = async (user, context = {}) => {
       scheduledPapers,
       list: exams.map(buildExam),
     },
+    errors: Object.keys(errors).length > 0 ? errors : null,
   };
 };
 

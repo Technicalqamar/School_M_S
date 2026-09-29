@@ -1,10 +1,11 @@
-import { ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon, CalendarDaysIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '../../hooks/useLocalization';
 
 const MODULE_ICONS = {
   homeworkAssignments: ClipboardDocumentListIcon,
   fees: BanknotesIcon,
   examination: AcademicCapIcon,
+  classSchedule: CalendarDaysIcon,
 };
 
 const StudentModulePlaceholder = ({ module }) => {
