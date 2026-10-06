@@ -5,6 +5,11 @@ import SchoolSettings from '../models/schoolSettings.model.js';
 import { ApiError } from '../utils/apiError.js';
 import cloudinary, { configureCloudinary, CLOUDINARY_FOLDERS } from '../config/cloudinary.js';
 import classValidation from './classValidation.service.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_FANOUT_TARGETS,
+} from '../constants/notification.constants.js';
 
 const uploadToCloudinary = (buffer, originalname) => {
   configureCloudinary();
@@ -81,7 +86,20 @@ const createStudent = async (data, file, baseUrl = '') => {
 
   try {
     const savedStudent = await Student.create(studentData);
-    return await Student.findById(savedStudent._id);
+    const student = await Student.findById(savedStudent._id);
+
+    // Runs only after the student row exists. notify() swallows its own errors,
+    // so a notification problem can never fail (or roll back) the admission.
+    await notificationEngine.notify({
+      type: NOTIFICATION_TYPES.STUDENT_CREATED,
+      title: 'New student admitted',
+      message: `${student.fullName} (${student.studentId}) was admitted to ${student.class} for ${student.academicYear}. Admission No: ${student.admissionNumber}.`,
+      fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+      academicYear: student.academicYear,
+      relatedEntity: { model: 'Student', id: student._id, label: student.studentId },
+    });
+
+    return student;
   } catch (error) {
     await deleteFromCloudinary(result.public_id);
 

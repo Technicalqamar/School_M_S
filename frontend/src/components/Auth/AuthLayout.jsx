@@ -27,6 +27,15 @@ const ROLE_STYLES = {
     mobileAccent: 'from-violet-600 to-violet-800',
     mobileRing: 'ring-violet-400/50',
   },
+  // Public landing page (portal chooser) — branding only, no portal is implied.
+  portal: {
+    fallbackIcon: ShieldCheckIcon,
+    description: 'Select your portal to continue to the sign in page.',
+    leftBg: 'from-blue-900 via-blue-800 to-blue-900',
+    accentBar: 'bg-yellow-400',
+    mobileAccent: 'from-blue-600 to-blue-800',
+    mobileRing: 'ring-yellow-400/50',
+  },
 };
 
 const AuthLayout = ({ children, title, subtitle, role = 'admin', description }) => {

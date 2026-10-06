@@ -6,6 +6,11 @@ import SchoolSettings from '../models/schoolSettings.model.js';
 import Counter from '../models/counter.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { FEE_TYPE_MAP } from '../validations/feeCollection.validation.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_FANOUT_TARGETS,
+} from '../constants/notification.constants.js';
 
 const CLASS_TO_FEE_CLASS = {
   Montessori: 'Montessori',
@@ -182,6 +187,21 @@ const collectFee = async (data) => {
     amountPaid,
     remainingAmount: stored.totalPayable - amountPaid,
     paymentMethod,
+  });
+
+  // Only reached once the collection row is persisted. notify() never throws, so
+  // the fee record stays valid even if the notification cannot be written.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.FEE_COLLECTED,
+    title: 'Fee collected',
+    message: `${Number(payment.amountPaid).toLocaleString('en-US')} collected from ${payment.studentName} (${payment.studentId}), ${payment.className} — ${payment.feeType} for ${payment.month || payment.exam || academicYear}. Receipt ${payment.receiptId} via ${payment.paymentMethod}.${payment.remainingAmount > 0 ? ` Balance left: ${Number(payment.remainingAmount).toLocaleString('en-US')}.` : ''}`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+    academicYear: payment.academicYear,
+    relatedEntity: {
+      model: 'FeeCollection',
+      id: payment._id,
+      label: payment.receiptId,
+    },
   });
 
   return payment;

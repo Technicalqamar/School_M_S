@@ -382,7 +382,7 @@ const sendEmailChangeOtpService = async (userId, newEmail, meta = {}) => {
       ),
     ]);
 
-    await EmailChangeRequest.create({
+    const emailChangeRequest = await EmailChangeRequest.create({
       user: userId,
       oldEmail: admin.email,
       newEmail,
@@ -395,7 +395,19 @@ const sendEmailChangeOtpService = async (userId, newEmail, meta = {}) => {
       userAgent: meta.userAgent || null,
     });
 
-    sendEmailChangeOtp(newEmail, otp).catch((err) => console.error('sendEmailChangeOtp:email send failed', err));
+    try {
+      await sendEmailChangeOtp(newEmail, otp);
+    } catch (err) {
+      // Mark the request failed so the user can retry immediately (instead of hitting 429).
+      await EmailChangeRequest.updateOne(
+        { _id: emailChangeRequest._id },
+        { $set: { status: 'FAILED', step: 'OTP_FAILED', reason: `Email delivery failed: ${err.message}` } }
+      );
+      console.error(`❌ [otp] change-email OTP NOT delivered | to=${newEmail} | flow=email-change`);
+      throw new ApiError(502, 'OTP email could not be sent. Please try again.');
+    }
+
+    console.log(`✅ [otp] change-email OTP delivered | to=${newEmail} | flow=email-change`);
 
     return { otpExpiry: otpExpiry.getTime() };
   } finally {
@@ -508,7 +520,7 @@ const initiatePasswordChange = async (userId, currentPassword, meta = {}) => {
       ),
     ]);
 
-    await PasswordChangeRequest.create({
+    const passwordChangeRequest = await PasswordChangeRequest.create({
       user: userId,
       email: admin.email,
       passwordVerified: true,
@@ -521,7 +533,19 @@ const initiatePasswordChange = async (userId, currentPassword, meta = {}) => {
       userAgent: meta.userAgent || null,
     });
 
-    sendPasswordChangeOtp(admin.email, otp).catch((err) => console.error('initiatePasswordChange:email send failed', err));
+    try {
+      await sendPasswordChangeOtp(admin.email, otp);
+    } catch (err) {
+      // Mark the request failed so the user can retry immediately (instead of hitting 429).
+      await PasswordChangeRequest.updateOne(
+        { _id: passwordChangeRequest._id },
+        { $set: { status: 'FAILED', step: 'OTP_FAILED', reason: `Email delivery failed: ${err.message}` } }
+      );
+      console.error(`❌ [otp] change-password OTP NOT delivered | to=${admin.email} | flow=password-change`);
+      throw new ApiError(502, 'OTP email could not be sent. Please try again.');
+    }
+
+    console.log(`✅ [otp] change-password OTP delivered | to=${admin.email} | flow=password-change`);
 
     return { otpExpiry: otpExpiry.getTime() };
   } finally {

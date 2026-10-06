@@ -15,12 +15,17 @@ import AdminVerifyOTPPage from './pages/auth/AdminAuth/VerifyOTP';
 import AdminResetPasswordPage from './pages/auth/AdminAuth/ResetPassword';
 import TeacherLoginPage from './pages/auth/TeacherAuth/TeacherLogin';
 import StudentLoginPage from './pages/auth/StudentAuth/StudentLogin';
+import Landing from './pages/public/Landing';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherMyClasses from './pages/teacher/MyClasses';
 import TeacherClassStudents from './pages/teacher/ClassStudents';
 import TeacherHomeworkAssignments from './pages/teacher/HomeworkAssignments';
 import TeacherMarksEntry from './pages/teacher/MarksEntry';
 import TeacherMyResults from './pages/teacher/MyResults';
+import TeacherClassSchedule from './pages/teacher/TeacherClassSchedule';
+import TeacherAttendance from './pages/teacher/TeacherAttendance';
+import TeacherNotifications from './pages/teacher/TeacherNotifications';
+import TeacherNotices from './pages/teacher/TeacherNotices';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentHomework from './pages/student/StudentHomework';
 import StudentAssignmentDetail from './pages/student/StudentAssignmentDetail';
@@ -28,6 +33,8 @@ import StudentFees from './pages/student/StudentFees';
 import StudentClassSchedule from './pages/student/StudentClassSchedule';
 import StudentAttendance from './pages/student/StudentAttendance';
 import StudentExamination from './pages/student/StudentExamination';
+import StudentNotifications from './pages/student/StudentNotifications';
+import StudentNotices from './pages/student/StudentNotices';
 import PortalAccess from './pages/portal/PortalAccess';
 import PortalDashboard from './pages/portal/PortalDashboard';
 import AdminLayout from './layouts/AdminLayout';
@@ -49,6 +56,9 @@ import StudentFeeDetailsPage from './pages/admin/FeeManagement/StudentFeeDetails
 import FeeReportsPage from './pages/admin/FeeManagement/Reports';
 import OutstandingDuesPage from './pages/admin/FeeManagement/OutstandingDues';
 import FeeVoucherGenerationPage from './pages/admin/FeeManagement/FeeVoucherGeneration';
+import SmsPage from './pages/admin/Communication/Sms';
+import NoticesPage from './pages/admin/Communication/Notices';
+import NotificationsPage from './pages/admin/Communication/Notifications';
 import SchoolSettings from './pages/admin/SchoolSettings';
 import ExamSetupPage from './pages/admin/ExamManagement/ExamSetup';
 import SubjectMarksPage from './pages/admin/ExamManagement/SubjectMarks';
@@ -66,7 +76,7 @@ function IndexRedirect() {
   const { loading: configLoading, preferences } = useSchoolConfig();
 
   if (authLoading) return null;
-  if (!user || !role) return <Navigate to="/admin/login" replace />;
+  if (!user || !role) return <Landing />;
 
   if (role !== 'admin') {
     return <Navigate to={DASHBOARD_ROUTES[role] || '/admin/login'} replace />;
@@ -78,6 +88,20 @@ function IndexRedirect() {
   const route = ADMIN_MODULES[landingPage] || '/admin';
   return <Navigate to={route} replace />;
 }
+
+function SmsRouteGuard({ children }) {
+  const { loading: configLoading, preferences } = useSchoolConfig();
+
+  // Wait for the real saved setting before deciding where to send the user.
+  if (configLoading) return <FullPageLoader />;
+
+  if (!preferences?.smsModuleEnabled) {
+    return <Navigate to="/admin/communication/notices" replace />;
+  }
+
+  return children;
+}
+
 function AppContent() {
   const { loading: authLoading } = useAuth();
   const { loaded: configLoaded, login: loginConfig } = useSchoolConfig();
@@ -126,6 +150,9 @@ function AppContent() {
             <Route path="fees/reports" element={<FeeReportsPage />} />
             <Route path="fees/outstanding-dues" element={<OutstandingDuesPage />} />
             <Route path="fees/voucher-generation" element={<FeeVoucherGenerationPage />} />
+            <Route path="communication/sms" element={<SmsRouteGuard><SmsPage /></SmsRouteGuard>} />
+            <Route path="communication/notices" element={<NoticesPage />} />
+            <Route path="communication/notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<SchoolSettings />} />
             <Route path="exams/setup" element={<ExamSetupPage />} />
             <Route path="exams/subjects-marks" element={<SubjectMarksPage />} />
@@ -148,6 +175,10 @@ function AppContent() {
             <Route path="homework" element={<TeacherHomeworkAssignments />} />
             <Route path="marks-entry" element={<TeacherMarksEntry />} />
             <Route path="my-results" element={<TeacherMyResults />} />
+            <Route path="class-schedule" element={<TeacherClassSchedule />} />
+            <Route path="attendance" element={<TeacherAttendance />} />
+            <Route path="notifications" element={<TeacherNotifications />} />
+            <Route path="notices" element={<TeacherNotices />} />
           </Route>
         </Route>
 
@@ -160,6 +191,8 @@ function AppContent() {
             <Route path="examination" element={<StudentExamination />} />
             <Route path="class-schedule" element={<StudentClassSchedule />} />
             <Route path="attendance" element={<StudentAttendance />} />
+            <Route path="notifications" element={<StudentNotifications />} />
+            <Route path="notices" element={<StudentNotices />} />
           </Route>
         </Route>
 
@@ -171,6 +204,8 @@ function AppContent() {
           <Route path="examination" element={<StudentExamination />} />
           <Route path="class-schedule" element={<StudentClassSchedule />} />
           <Route path="attendance" element={<StudentAttendance />} />
+          <Route path="notifications" element={<StudentNotifications />} />
+          <Route path="notices" element={<StudentNotices />} />
         </Route>
 
         <Route path="/" element={<IndexRedirect />} />

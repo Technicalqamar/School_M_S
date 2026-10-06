@@ -6,6 +6,11 @@ import Holiday from '../models/holiday.model.js';
 import SchoolSettings from '../models/schoolSettings.model.js';
 import attendanceRules from './attendanceRules.service.js';
 import { ApiError } from '../utils/apiError.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_RECIPIENT_ROLES,
+} from '../constants/notification.constants.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -607,6 +612,34 @@ const assertNoExistingPayment = async (payrollId) => {
   }
 };
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// Salary notifications are addressed to the teacher the payroll itself belongs
+// to — the teacherId is read from the payroll/payment record, never from a
+// request value. A Pending payment only records an obligation, so it is not a
+// settled salary and does not notify.
+const notifyTeacherSalaryPaid = async (payment, payroll) => {
+  if (!payment || payment.status !== 'Paid' || !payment.teacherId) return;
+
+  const period = `${MONTH_NAMES[payment.payrollMonth - 1] || `Month ${payment.payrollMonth}`} ${payment.payrollYear}`;
+  const amount = Number(payment.amountPaid || 0).toLocaleString('en-US');
+  const net = Number(payroll?.netSalary ?? payment.amountPaid ?? 0).toLocaleString('en-US');
+
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.SALARY_PAYMENT_RECORDED,
+    title: 'Salary payment recorded',
+    message: `${amount} paid to you for ${period} via ${payment.paymentMethod}.${payment.paymentReference ? ` Reference: ${payment.paymentReference}.` : ''} Net salary for the period: ${net}.`,
+    recipient: {
+      role: NOTIFICATION_RECIPIENT_ROLES.TEACHER,
+      teacherId: payment.teacherId,
+    },
+    relatedEntity: { model: 'Payroll', id: payment._id, label: payment.paymentReference || period },
+  });
+};
+
 const createPayment = async (data) => {
   const payrollId = String(data.payrollId);
   const payroll = await findPayrollForPayment(payrollId);
@@ -621,8 +654,10 @@ const createPayment = async (data) => {
 
   const status = data.status === undefined ? 'Paid' : data.status;
 
+  let payment;
+  let enriched;
   try {
-    const payment = await Payroll.create({
+    payment = await Payroll.create({
       payrollId: payroll._id,
       teacherId: payroll.teacherId,
       payrollMonth: payroll.payrollMonth,
@@ -642,8 +677,7 @@ const createPayment = async (data) => {
       await Payroll.findByIdAndUpdate(payroll._id, { status: 'Paid' });
     }
 
-    const [enriched] = await enrichPayments([payment.toObject()]);
-    return enriched;
+    [enriched] = await enrichPayments([payment.toObject()]);
   } catch (error) {
     if (error.code === 11000) {
       throw new ApiError(409, 'A payment record already exists for this payroll');
@@ -656,6 +690,12 @@ const createPayment = async (data) => {
 
     throw error;
   }
+
+  // After every write above has succeeded. The event key is derived from the
+  // payment document itself, so an amended payment cannot notify twice.
+  await notifyTeacherSalaryPaid(payment, payroll);
+
+  return enriched;
 };
 
 const getPayments = async (query = {}) => {
@@ -773,8 +813,10 @@ const updatePayment = async (id, data) => {
     assertPaymentDateNotFuture(data.paymentDate);
   }
 
+  let updated;
+  let enriched;
   try {
-    const updated = await Payroll.findByIdAndUpdate(
+    updated = await Payroll.findByIdAndUpdate(
       id,
       {
         ...(data.amountPaid !== undefined ? { amountPaid: data.amountPaid } : {}),
@@ -790,8 +832,7 @@ const updatePayment = async (id, data) => {
       await Payroll.findByIdAndUpdate(payroll._id, { status: 'Paid' });
     }
 
-    const [enriched] = await enrichPayments([updated.toObject()]);
-    return enriched;
+    [enriched] = await enrichPayments([updated.toObject()]);
   } catch (error) {
     if (error.code === 11000) {
       throw new ApiError(409, 'A payment record already exists for this payroll');
@@ -804,6 +845,14 @@ const updatePayment = async (id, data) => {
 
     throw error;
   }
+
+  // A payment that was already paid is not re-announced; the same payment
+  // document maps to the same event key either way.
+  if (updated.status === 'Paid' && existing.status !== 'Paid') {
+    await notifyTeacherSalaryPaid(updated, payroll);
+  }
+
+  return enriched;
 };
 
 const deletePayment = async (id) => {

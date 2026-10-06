@@ -1,5 +1,6 @@
 import DateTime from '../DateTime/DateTime';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
+import TeacherNotificationBell from '../TeacherNotificationBell/TeacherNotificationBell';
 import TeacherDropdown from '../TeacherDropdown/TeacherDropdown';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
@@ -37,6 +38,7 @@ const TeacherHeader = ({ sidebarOpen }) => {
             <DateTime />
           </div>
           <ThemeToggle />
+          <TeacherNotificationBell />
           <TeacherDropdown />
         </div>
       </div>

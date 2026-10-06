@@ -52,6 +52,7 @@ const DEFAULT_ACADEMIC = {
   lateGracePeriod: 5,
   allowLeaveMarking: true,
   allowHalfDayLeave: false,
+  teacherManualStudentAttendance: false,
 };
 
 const DEFAULT_BRANDING = {
@@ -88,6 +89,7 @@ const DEFAULT_PREFERENCES = {
   enableEmailNotifications: true,
   enableSmsNotifications: false,
   enableWhatsAppNotifications: false,
+  smsModuleEnabled: false,
   allowPublicWebsite: false,
   enableParentPortal: false,
   enableTeacherPortal: false,
@@ -134,6 +136,7 @@ const mapApiToAcademic = (api) => ({
   lateGracePeriod: api.lateGracePeriod ?? 5,
   allowLeaveMarking: api.allowLeaveMarking ?? true,
   allowHalfDayLeave: api.allowHalfDayLeave ?? false,
+  teacherManualStudentAttendance: api.teacherManualStudentAttendance ?? false,
 });
 
 const mapApiToBranding = (api) => ({
@@ -170,6 +173,7 @@ const mapApiToPreferences = (api) => ({
   enableEmailNotifications: api.enableEmailNotifications ?? true,
   enableSmsNotifications: api.enableSmsNotifications ?? false,
   enableWhatsAppNotifications: api.enableWhatsAppNotifications ?? false,
+  smsModuleEnabled: api.smsModuleEnabled ?? false,
   allowPublicWebsite: api.allowPublicWebsite ?? false,
   enableParentPortal: api.enableParentPortal ?? false,
   enableTeacherPortal: api.enableTeacherPortal ?? false,
@@ -262,6 +266,7 @@ const SchoolSettings = () => {
         lateGracePeriod: formData.lateGracePeriod,
         allowLeaveMarking: formData.allowLeaveMarking,
         allowHalfDayLeave: formData.allowHalfDayLeave,
+        teacherManualStudentAttendance: formData.teacherManualStudentAttendance,
       };
       const res = await schoolSettingsService.updateAcademicSettings(payload);
       setApiSettings(res.data.settings);
@@ -349,6 +354,7 @@ const SchoolSettings = () => {
         enableEmailNotifications: formData.enableEmailNotifications,
         enableSmsNotifications: formData.enableSmsNotifications,
         enableWhatsAppNotifications: formData.enableWhatsAppNotifications,
+        smsModuleEnabled: formData.smsModuleEnabled,
         allowPublicWebsite: formData.allowPublicWebsite,
         enableParentPortal: formData.enableParentPortal,
         enableTeacherPortal: formData.enableTeacherPortal,

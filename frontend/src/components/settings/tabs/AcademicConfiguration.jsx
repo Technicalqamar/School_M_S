@@ -241,7 +241,17 @@ const AcademicConfiguration = ({ data, onSave, saving }) => {
             onChange={handleToggle('autoMarkAbsent')}
             disabled={!editing}
           />
+          <Toggle
+            label="Teacher Manual Student Attendance"
+            checked={form.teacherManualStudentAttendance}
+            onChange={handleToggle('teacherManualStudentAttendance')}
+            disabled={!editing}
+          />
         </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 -mb-1">
+          When ON, teachers can mark student attendance for the class of their first scheduled timetable period only. When
+          OFF, teachers can only see their own attendance and leave.
+        </p>
       </CardSection>
 
       <CardSection title="Late Attendance Rules">

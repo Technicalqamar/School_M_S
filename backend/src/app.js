@@ -44,6 +44,11 @@ import teacherClassStudentsRoutes from './routes/teacherClassStudents.routes.js'
 import teacherHomeworkRoutes from './routes/teacherHomework.routes.js';
 import teacherMarksEntryRoutes from './routes/teacherMarksEntry.routes.js';
 import teacherMyResultsRoutes from './routes/teacherMyResults.routes.js';
+import teacherClassScheduleRoutes from './routes/teacherClassSchedule.routes.js';
+import teacherAttendancePortalRoutes from './routes/teacherAttendancePortal.routes.js';
+import teacherLeaveRequestRoutes from './routes/teacherLeaveRequest.routes.js';
+import teacherStudentAttendanceRoutes from './routes/teacherStudentAttendance.routes.js';
+import teacherNotificationRoutes from './routes/teacherNotification.routes.js';
 import studentDashboardRoutes from './routes/studentDashboard.routes.js';
 import studentHomeworkRoutes from './routes/studentHomework.routes.js';
 import studentFeesRoutes from './routes/studentFees.routes.js';
@@ -51,6 +56,12 @@ import studentClassScheduleRoutes from './routes/studentClassSchedule.routes.js'
 import studentPortalAttendanceRoutes from './routes/studentPortalAttendance.routes.js';
 import studentLeaveRequestRoutes from './routes/studentLeaveRequest.routes.js';
 import studentPortalExamRoutes from './routes/studentPortalExam.routes.js';
+import studentNotificationRoutes from './routes/studentNotification.routes.js';
+import communicationSmsRoutes from './routes/communicationSms.routes.js';
+import noticeRoutes from './routes/notice.routes.js';
+import studentNoticeRoutes from './routes/studentNotice.routes.js';
+import teacherNoticeRoutes from './routes/teacherNotice.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 import portalRoutes from './routes/portal.routes.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 
@@ -124,6 +135,12 @@ app.use('/api/v1/teacher/my-classes', teacherClassStudentsRoutes);
 app.use('/api/v1/teacher/homework', teacherHomeworkRoutes);
 app.use('/api/v1/teacher/marks-entry', teacherMarksEntryRoutes);
 app.use('/api/v1/teacher/my-results', teacherMyResultsRoutes);
+app.use('/api/v1/teacher/class-schedule', teacherClassScheduleRoutes);
+app.use('/api/v1/teacher/attendance', teacherAttendancePortalRoutes);
+app.use('/api/v1/teacher/leave-requests', teacherLeaveRequestRoutes);
+app.use('/api/v1/teacher/student-attendance', teacherStudentAttendanceRoutes);
+app.use('/api/v1/teacher/notifications', teacherNotificationRoutes);
+app.use('/api/v1/teacher/notices', teacherNoticeRoutes);
 app.use('/api/v1/student/dashboard', studentDashboardRoutes);
 app.use('/api/v1/student/homework', studentHomeworkRoutes);
 app.use('/api/v1/student/fees', studentFeesRoutes);
@@ -131,6 +148,11 @@ app.use('/api/v1/student/class-schedule', studentClassScheduleRoutes);
 app.use('/api/v1/student/attendance', studentPortalAttendanceRoutes);
 app.use('/api/v1/student/leave-requests', studentLeaveRequestRoutes);
 app.use('/api/v1/student/exam', studentPortalExamRoutes);
+app.use('/api/v1/student/notifications', studentNotificationRoutes);
+app.use('/api/v1/student/notices', studentNoticeRoutes);
+app.use('/api/v1/communication/sms', communicationSmsRoutes);
+app.use('/api/v1/communication/notices', noticeRoutes);
+app.use('/api/v1/communication/notifications', notificationRoutes);
 app.use('/api/v1/portal', portalRoutes);
 
 // Health check

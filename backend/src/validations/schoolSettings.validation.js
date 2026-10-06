@@ -118,6 +118,7 @@ const validateAcademicConfiguration = (req, res, next) => {
     defaultLanguage, timeFormat,
     weekendEnabled, weekendDays,
     allowEditAfterSubmit, editTimeLimit, autoMarkAbsent,
+    teacherManualStudentAttendance,
     lateAllowed, lateGracePeriod,
     allowLeaveMarking, allowHalfDayLeave,
   } = req.body;
@@ -207,6 +208,12 @@ const validateAcademicConfiguration = (req, res, next) => {
   if (autoMarkAbsent !== undefined) {
     if (typeof autoMarkAbsent !== 'boolean') {
       throw new ApiError(400, 'Auto mark absent must be a boolean');
+    }
+  }
+
+  if (teacherManualStudentAttendance !== undefined) {
+    if (typeof teacherManualStudentAttendance !== 'boolean') {
+      throw new ApiError(400, 'Teacher manual student attendance must be a boolean');
     }
   }
 
@@ -333,6 +340,7 @@ const validateSystemPreferences = (req, res, next) => {
   const {
     autoLogout, defaultLandingPage,
     enableNotifications, enableEmailNotifications, enableSmsNotifications, enableWhatsAppNotifications,
+    smsModuleEnabled,
     showSchoolLogoOnLogin, showSchoolNameOnLogin, splashEnabled, loaderStyle,
     currency, currencySymbol,
   } = req.body;
@@ -370,6 +378,12 @@ const validateSystemPreferences = (req, res, next) => {
   if (enableWhatsAppNotifications !== undefined) {
     if (typeof enableWhatsAppNotifications !== 'boolean') {
       throw new ApiError(400, 'WhatsApp notifications must be a boolean');
+    }
+  }
+
+  if (smsModuleEnabled !== undefined) {
+    if (typeof smsModuleEnabled !== 'boolean') {
+      throw new ApiError(400, 'SMS module must be a boolean');
     }
   }
 

@@ -2,10 +2,18 @@ import mongoose from 'mongoose';
 import Teacher from '../models/teacher.model.js';
 import Admin from '../models/admin.model.js';
 import Class from '../models/class.model.js';
+import Student from '../models/student.model.js';
+import UserAccount from '../models/userAccount.model.js';
 import Assignment from '../models/assignment.model.js';
 import SchoolSettings from '../models/schoolSettings.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { getTeacherClassScope } from './teacherScope.service.js';
+import { classMembershipFilter } from './communicationTargeting.service.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_RECIPIENT_ROLES,
+} from '../constants/notification.constants.js';
 
 const VALID_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue'];
 const MONTH_STRING_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -149,6 +157,61 @@ const enrichAssignment = async (assignment) => {
   };
 };
 
+// Homework is addressed to the students actually enrolled in that assignment's
+// class for that academic year — the roster is read from the database, never
+// taken from the request.
+const notifyClassStudentsAboutAssignment = async (assignment) => {
+  const { className, academicYear } = assignment;
+  if (!className || !academicYear) return;
+
+  const students = await Student.find({
+    ...classMembershipFilter(className, academicYear),
+    status: 'Active',
+  })
+    .select('_id')
+    .lean();
+
+  if (!students.length) return;
+
+  // Only students who actually have an active portal login can receive it, so
+  // the fan-out never produces a notification nobody could ever read.
+  const accounts = await UserAccount.find({
+    role: NOTIFICATION_RECIPIENT_ROLES.STUDENT,
+    referenceModel: 'Student',
+    referenceId: { $in: students.map((student) => student._id) },
+    isActive: true,
+  })
+    .select('referenceId')
+    .lean();
+
+  const reachable = new Set(accounts.map((account) => String(account.referenceId)));
+  const recipients = students.filter((student) => reachable.has(String(student._id)));
+  if (!recipients.length) return;
+
+  const dueDate = assignment.dueDate
+    ? new Date(assignment.dueDate).toISOString().slice(0, 10)
+    : null;
+  const byTeacher = assignment.teacher?.fullName || 'Your teacher';
+
+  // notify() swallows its own errors, so a class-sized fan-out can never fail
+  // the assignment that was already saved.
+  await Promise.all(
+    recipients.map((student) =>
+      notificationEngine.notify({
+        type: NOTIFICATION_TYPES.HOMEWORK_CREATED,
+        title: `New homework: ${assignment.title}`,
+        message: `${byTeacher} assigned "${assignment.title}"${assignment.subjectName ? ` for ${assignment.subjectName}` : ''} in ${className}.${dueDate ? ` Due on ${dueDate}.` : ''}`,
+        recipient: {
+          role: NOTIFICATION_RECIPIENT_ROLES.STUDENT,
+          profileId: student._id,
+        },
+        academicYear,
+        relatedEntity: { model: 'Assignment', id: assignment.id, label: assignment.title },
+      }),
+    ),
+  );
+};
+
 const createAssignment = async (user, payload) => {
   const teacher = await resolveTeacherProfile(user);
   assertActiveTeacher(teacher);
@@ -171,7 +234,11 @@ const createAssignment = async (user, payload) => {
 
   const assignment = await Assignment.create(sanitized);
 
-  return enrichAssignment(assignment);
+  const enriched = await enrichAssignment(assignment);
+
+  await notifyClassStudentsAboutAssignment(enriched);
+
+  return enriched;
 };
 
 const getTeacherAssignments = async (user, { search, status, subjectId, classId, page = 1, limit = 20 } = {}) => {

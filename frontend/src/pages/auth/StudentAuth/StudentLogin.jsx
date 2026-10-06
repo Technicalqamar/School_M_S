@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import authService from '../../../services/auth/auth.service';
+import { getWrongRoleIdMessage } from '../../../utils/wrongRoleId';
 import AuthLayout from '../../../components/Auth/AuthLayout';
 import Input from '../../../components/common/Input/Input';
 import Button from '../../../components/common/Button/Button';
@@ -33,6 +34,17 @@ const StudentLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // UX guard: a teacher ID typed into the student form is rejected here,
+    // before any request reaches the backend.
+    const wrongRoleMessage = getWrongRoleIdMessage(formData.studentId, 'student');
+    if (wrongRoleMessage) {
+      setError(wrongRoleMessage);
+      setFieldErrors({});
+      toast.error(wrongRoleMessage);
+      return;
+    }
+
     setLoading(true);
     setError('');
 

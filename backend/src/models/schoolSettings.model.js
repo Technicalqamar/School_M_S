@@ -143,6 +143,15 @@ const schoolSettingsSchema = new mongoose.Schema(
       default: false,
     },
 
+    // ─── Teacher Attendance Permissions ───────────
+    // When ON, teachers get permission to manually mark attendance for the
+    // students of the class derived from their timetable (first scheduled
+    // period). When OFF (default), no teacher has student-attendance access.
+    teacherManualStudentAttendance: {
+      type: Boolean,
+      default: false,
+    },
+
     // ─── Late Attendance Rules ────────────────────
     lateAllowed: {
       type: Boolean,
@@ -285,6 +294,10 @@ const schoolSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    smsModuleEnabled: {
+      type: Boolean,
+      default: false,
+    },
 
     // ──────────────────────────────────────────────
     // Login & Splash Screen
@@ -333,10 +346,12 @@ schoolSettingsSchema.statics.getSettings = async function () {
         allowEditAfterSubmit: false,
         editTimeLimit: 1,
         autoMarkAbsent: false,
+        teacherManualStudentAttendance: false,
         lateAllowed: false,
         lateGracePeriod: 5,
         allowLeaveMarking: true,
         allowHalfDayLeave: false,
+        smsModuleEnabled: false,
       },
     },
     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },

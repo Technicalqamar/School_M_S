@@ -1,6 +1,7 @@
 import DateTime from '../DateTime/DateTime';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
 import StudentDropdown from '../StudentDropdown/StudentDropdown';
+import StudentNotificationBell from '../StudentNotificationBell/StudentNotificationBell';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 
@@ -37,6 +38,7 @@ const StudentHeader = ({ sidebarOpen }) => {
             <DateTime />
           </div>
           <ThemeToggle />
+          <StudentNotificationBell />
           <StudentDropdown />
         </div>
       </div>

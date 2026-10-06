@@ -3,6 +3,12 @@ import Leave from '../models/leave.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
 import { ApiError } from '../utils/apiError.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_RECIPIENT_ROLES,
+  NOTIFICATION_FANOUT_TARGETS,
+} from '../constants/notification.constants.js';
 
 const VALID_LEAVE_STATUSES = ['Pending', 'Approved', 'Rejected'];
 const ACTIVE_STATUSES = ['Pending', 'Approved'];
@@ -155,8 +161,9 @@ const createLeave = async (data, userId) => {
   const requestedStatus = status && VALID_LEAVE_STATUSES.includes(status) ? status : 'Pending';
   const isDecision = ['Approved', 'Rejected'].includes(requestedStatus);
 
+  let leave;
   try {
-    const leave = await Leave.create({
+    leave = await Leave.create({
       type,
       [resolved.field]: resolved.personId,
       class: classValue,
@@ -169,8 +176,6 @@ const createLeave = async (data, userId) => {
       approvedBy: isDecision ? userId : undefined,
       approvedAt: isDecision ? new Date() : undefined,
     });
-
-    return await populateAndMap(leave);
   } catch (error) {
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((e) => e.message);
@@ -178,6 +183,24 @@ const createLeave = async (data, userId) => {
     }
     throw error;
   }
+
+  const mapped = await populateAndMap(leave);
+
+  // A leave created already decided (an admin entering a past decision) is not
+  // awaiting review, so only a genuinely pending request alerts the office.
+  if (!isDecision) {
+    const roleLabel = type === 'Student' ? 'Student' : 'Teacher';
+    await notificationEngine.notify({
+      type: NOTIFICATION_TYPES.LEAVE_REQUESTED,
+      title: 'New leave request',
+      message: `${roleLabel} ${mapped.name} (${mapped.personId}) requested leave from ${normalizeDateStr(leave.fromDate)} to ${normalizeDateStr(leave.toDate)}.${mapped.class ? ` Class: ${mapped.class}.` : ''} Reason: ${leave.reason}`,
+      fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+      academicYear,
+      relatedEntity: { model: 'Leave', id: leave._id, label: mapped.personId },
+    });
+  }
+
+  return mapped;
 };
 
 const mapLeave = (leave) => {
@@ -423,8 +446,39 @@ const decideLeave = async (id, status, userId) => {
     leave.approvedBy = userId;
     leave.approvedAt = new Date();
   }
+
+  // Read before populateAndMap: populating rewrites `leave.student`/`leave.teacher`
+  // into full profile documents, which is no longer a usable recipient id.
+  const isStudentLeave = leave.type === 'Student';
+  const requesterProfileId = isStudentLeave ? leave.student : leave.teacher;
+
   await leave.save();
-  return await populateAndMap(leave);
+
+  const mapped = await populateAndMap(leave);
+
+  // The decision goes to the actual requester — the profile the leave record
+  // points at, never an id taken from the request body.
+  if ((status === 'Approved' || status === 'Rejected') && requesterProfileId) {
+    const decision = status.toLowerCase();
+    await notificationEngine.notify({
+      type: status === 'Approved'
+        ? NOTIFICATION_TYPES.LEAVE_APPROVED
+        : NOTIFICATION_TYPES.LEAVE_REJECTED,
+      title: `Leave ${decision}`,
+      message: `Your leave request from ${normalizeDateStr(leave.fromDate)} to ${normalizeDateStr(leave.toDate)} has been ${decision} by the administration.`,
+      recipient: {
+        role: isStudentLeave
+          ? NOTIFICATION_RECIPIENT_ROLES.STUDENT
+          : NOTIFICATION_RECIPIENT_ROLES.TEACHER,
+        profileId: requesterProfileId,
+      },
+      actor: userId,
+      academicYear: leave.academicYear,
+      relatedEntity: { model: 'Leave', id: leave._id, label: mapped.personId },
+    });
+  }
+
+  return mapped;
 };
 
 const approveLeave = (id, userId) => decideLeave(id, 'Approved', userId);

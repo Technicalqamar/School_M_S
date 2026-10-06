@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, Bars3Icon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, Bars3Icon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const [feeManagementOpen, setFeeManagementOpen] = useState(false);
   const [examinationOpen, setExaminationOpen] = useState(false);
   const [userAccountsOpen, setUserAccountsOpen] = useState(false);
+  const [communicationOpen, setCommunicationOpen] = useState(false);
   const { t } = useTranslation();
+  const { preferences } = useSchoolConfig();
+  const smsModuleEnabled = preferences?.smsModuleEnabled ?? false;
   const { schoolBranding } = useSchoolBranding();
   const logoUrl = schoolBranding?.adminPanelLogo ? getImageUrl(schoolBranding.adminPanelLogo) : null;
   const principalName = schoolBranding?.principalName || 'Admin Panel';
@@ -510,6 +514,66 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   }}
                 >
                   <UserCircleIcon className="h-5 w-5 flex-shrink-0" />
+                </NavLink>
+              )}
+            </li>
+            <li className="flex justify-center">
+              {isOpen ? (
+                <div className="w-[calc(100%-16px)]">
+                  <button
+                    onClick={() => setCommunicationOpen(!communicationOpen)}
+                    className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ChatBubbleLeftRightIcon className="h-5 w-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">{t('communication')}</span>
+                    </div>
+                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${communicationOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {communicationOpen && (
+                    <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
+                      {[
+                        { to: '/admin/communication/sms', label: 'sms' },
+                        { to: '/admin/communication/notices', label: 'notices' },
+                        { to: '/admin/communication/notifications', label: 'notifications' },
+                      ]
+                        .filter((item) => smsModuleEnabled || item.to !== '/admin/communication/sms')
+                        .map((item) => (
+                          <NavLink
+                            key={item.to}
+                            to={item.to}
+                            className={({ isActive }) =>
+                              `block px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                                isActive
+                                  ? 'bg-blue-500 text-white shadow-md font-medium'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400'
+                              }`
+                            }
+                            onClick={() => {
+                              if (window.innerWidth < 768) toggleSidebar();
+                            }}
+                          >
+                            {t(item.label)}
+                          </NavLink>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <NavLink
+                  to={smsModuleEnabled ? '/admin/communication/sms' : '/admin/communication/notices'}
+                  className={({ isActive }) =>
+                    `flex items-center transition-all duration-200 rounded-lg ${
+                      isActive
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400'
+                    } w-10 h-10 justify-center`
+                  }
+                  onClick={() => {
+                    if (window.innerWidth < 768) toggleSidebar();
+                  }}
+                >
+                  <ChatBubbleLeftRightIcon className="h-5 w-5 flex-shrink-0" />
                 </NavLink>
               )}
             </li>

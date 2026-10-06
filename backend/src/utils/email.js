@@ -2,11 +2,20 @@ import nodemailer from 'nodemailer';
 
 let transporter = null;
 
+// Google shows App Passwords as "abcd efgh ijkl mnop" — SMTP auth needs them without spaces.
+const sanitizePass = (pass = '') => String(pass ?? '').replace(/\s+/g, '');
+
+const maskEmail = (email = '') => {
+  const [name = '', domain = ''] = String(email).split('@');
+  const masked = `${name.slice(0, 2)}${'*'.repeat(Math.max(name.length - 2, 0))}`;
+  return domain ? `${masked}@${domain}` : masked;
+};
+
 const getTransporter = () => {
   if (transporter) return transporter;
 
   const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const pass = sanitizePass(process.env.EMAIL_PASS);
 
   if (!user || !pass) {
     throw new Error(
@@ -21,7 +30,35 @@ const getTransporter = () => {
     auth: { user, pass },
   });
 
+  console.log(`[email] SMTP transport ready | service=gmail | user=${maskEmail(user)}`);
   return transporter;
+};
+
+/**
+ * Single delivery path shared by every OTP sender.
+ * Logs success/failure with the real recipient and rethrows on failure so
+ * callers never report "OTP sent" when nothing actually left the server.
+ */
+const deliver = async ({ to, subject, html }) => {
+  try {
+    const info = await getTransporter().sendMail({
+      from: `"School Management" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`[email] SENT | to=${to} | subject="${subject}" | messageId=${info.messageId || 'n/a'}`);
+    return info;
+  } catch (err) {
+    const hint =
+      err.responseCode === 535
+        ? ' | hint=Gmail rejected the credentials: EMAIL_PASS must be a valid Google App Password (2-Step Verification ON) for EMAIL_USER'
+        : '';
+    console.error(
+      `❌ Email send failed | to=${to} | subject="${subject}" | code=${err.responseCode || 'n/a'} | error=${err.response || err.message}${hint}`
+    );
+    throw err;
+  }
 };
 
 const sendOtpEmail = async (email, otp) => {
@@ -64,14 +101,11 @@ const sendOtpEmail = async (email, otp) => {
 </body>
 </html>`;
 
-  const mailOptions = {
-    from: `"School Management" <${process.env.EMAIL_USER}>`,
+  return deliver({
     to: email,
     subject: 'Password Reset OTP - School Management System',
     html,
-  };
-
-  await getTransporter().sendMail(mailOptions);
+  });
 };
 
 const sendEmailChangeOtp = async (email, otp) => {
@@ -114,14 +148,11 @@ const sendEmailChangeOtp = async (email, otp) => {
 </body>
 </html>`;
 
-  const mailOptions = {
-    from: `"School Management" <${process.env.EMAIL_USER}>`,
+  return deliver({
     to: email,
     subject: 'Email Change OTP - School Management System',
     html,
-  };
-
-  await getTransporter().sendMail(mailOptions);
+  });
 };
 
 const sendPasswordChangeOtp = async (email, otp) => {
@@ -164,14 +195,11 @@ const sendPasswordChangeOtp = async (email, otp) => {
 </body>
 </html>`;
 
-  const mailOptions = {
-    from: `"School Management" <${process.env.EMAIL_USER}>`,
+  return deliver({
     to: email,
     subject: 'Password Change OTP - School Management System',
     html,
-  };
-
-  await getTransporter().sendMail(mailOptions);
+  });
 };
 
 export { sendOtpEmail, sendEmailChangeOtp, sendPasswordChangeOtp };

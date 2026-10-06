@@ -71,6 +71,12 @@ const SystemPreferences = ({ data, onSave, saving }) => {
         </div>
       </CardSection>
 
+      <CardSection title="Modules">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <Toggle label="SMS Module" checked={form.smsModuleEnabled} onChange={() => setForm((p) => ({ ...p, smsModuleEnabled: !p.smsModuleEnabled }))} disabled={!editing} />
+        </div>
+      </CardSection>
+
       <div className="flex items-center gap-3">
         {editing ? (
           <button

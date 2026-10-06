@@ -4,14 +4,22 @@ import {
   BookOpenIcon,
   CalendarDaysIcon,
   PencilSquareIcon,
+  ClipboardDocumentCheckIcon,
+  BellIcon,
+  MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import CardSection from '../../components/common/CardSection/CardSection';
 import StatCard from '../../components/common/StatCard/StatCard';
+import QuickAccessGrid from '../../components/common/QuickAccessGrid/QuickAccessGrid';
 import teacherDashboardService, { TEACHER_DASHBOARD_EMPTY_DATA } from '../../services/dashboard/teacherDashboard.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
 import { useTranslation } from '../../hooks/useLocalization';
+import useNoticeUnreadCount from '../../hooks/useNoticeUnreadCount';
+import useNotificationUnreadCount from '../../hooks/useNotificationUnreadCount';
+import teacherNoticesService from '../../services/teacher/teacherNotices.service';
+import teacherNotificationsService from '../../services/teacher/teacherNotifications.service';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -65,15 +73,68 @@ const TeacherDashboard = () => {
   const teacherId = user?.teacherId;
 
   const statistics = data.statistics || TEACHER_DASHBOARD_EMPTY_DATA.statistics;
-  const myClasses = data.myClasses || [];
   const todayClasses = data.todayClasses || [];
   const upcomingHomework = data.upcomingHomework || [];
 
+  // "Pending Homework" is intentionally not shown as a stat card: the Teacher
+  // Panel has no homework backend module, so the dashboard endpoint always
+  // returns a hard-coded 0 — a permanent zero adds no real information and is
+  // already conveyed by the Upcoming Homework section below. Only stats backed
+  // by real, usable data are surfaced.
   const statCards = [
     { label: 'My Classes', value: formatCount(statistics.myClasses), icon: BookOpenIcon, color: 'blue' },
     { label: 'My Students', value: formatCount(statistics.myStudents), icon: UsersIcon, color: 'green' },
     { label: "Today's Classes", value: formatCount(statistics.todayClasses), icon: CalendarDaysIcon, color: 'yellow' },
-    { label: 'Pending Homework', value: formatCount(statistics.pendingHomework), icon: PencilSquareIcon, color: 'red' },
+  ];
+
+  // Real, recipient-scoped unread counts for the two communication shortcuts.
+  // Each badge is hidden at 0 and capped at 9+, and the two are never combined —
+  // this is the same Notification count the header Bell shows and the same
+  // Notice count the sidebar shows. No SMS tile exists because the Teacher Panel
+  // has no SMS route (SMS is an Admin-only module), and no count is invented for
+  // it.
+  const unreadNotifications = useNotificationUnreadCount(teacherNotificationsService);
+  const unreadNotices = useNoticeUnreadCount(teacherNoticesService);
+
+  const quickAccessItems = [
+    {
+      to: '/teacher/dashboard/class-schedule',
+      label: 'Class Schedule',
+      icon: CalendarDaysIcon,
+      accent: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    },
+    {
+      to: '/teacher/dashboard/my-classes',
+      label: 'My Classes',
+      icon: BookOpenIcon,
+      accent: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+    },
+    {
+      to: '/teacher/dashboard/homework',
+      label: 'Homework Assignments',
+      icon: PencilSquareIcon,
+      accent: 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+    },
+    {
+      to: '/teacher/dashboard/my-results',
+      label: 'My Results',
+      icon: ClipboardDocumentCheckIcon,
+      accent: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+    },
+    {
+      to: '/teacher/dashboard/notifications',
+      label: 'Notifications',
+      icon: BellIcon,
+      accent: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+      badge: unreadNotifications,
+    },
+    {
+      to: '/teacher/dashboard/notices',
+      label: 'Notices',
+      icon: MegaphoneIcon,
+      accent: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+      badge: unreadNotices,
+    },
   ];
 
   return (
@@ -103,65 +164,53 @@ const TeacherDashboard = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Quick access — Class Schedule, communication shortcuts and other
+          frequent pages. Only the presentation is shared with the Student
+          dashboard; the Teacher Panel's own routes, data and sections are
+          untouched. */}
+      <CardSection title="Quick Access">
+        <QuickAccessGrid items={quickAccessItems} columnsClassName="grid-cols-2 sm:grid-cols-2 lg:grid-cols-4" />
+      </CardSection>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((card) => (
           <StatCard key={card.label} icon={card.icon} label={card.label} value={card.value} color={card.color} />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <CardSection title="My Classes Overview" className="lg:col-span-2">
-          {myClasses.length > 0 ? (
-            <div>
-              <div className="grid grid-cols-3 gap-4 pb-3 border-b border-gray-100 dark:border-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                <span>Class</span>
-                <span>Subject</span>
-                <span className="text-right">Students</span>
-              </div>
-              <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-                {myClasses.map((item) => (
-                  <li key={`${item.className}-${item.subject}`} className="grid grid-cols-3 gap-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-medium text-gray-900 dark:text-white">{item.className}</span>
-                    <span>{item.subject}</span>
-                    <span className="text-right">{formatCount(item.totalStudents)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <EmptyState
-              icon={BookOpenIcon}
-              title="No classes assigned yet"
-              description="Your assigned classes with their subjects and student counts will appear here."
-            />
-          )}
-        </CardSection>
-
-        <CardSection title="Today's Classes">
-          {todayClasses.length > 0 ? (
-            <ul className="space-y-3">
-              {todayClasses.map((item) => (
-                <li
-                  key={`${item.time}-${item.className}-${item.subject}`}
-                  className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5"
-                >
-                  <div className="flex-shrink-0 w-16 text-xs font-semibold text-blue-600 dark:text-blue-400">{item.time}</div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.className}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subject}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              icon={CalendarDaysIcon}
-              title="No classes scheduled today"
-              description="Today's class schedule will appear here."
-            />
-          )}
-        </CardSection>
-      </div>
+      <CardSection title="Today's Classes">
+        {todayClasses.length > 0 ? (
+          <ul className="space-y-3">
+            {todayClasses.map((item) => (
+              <li
+                key={`${item.period}-${item.className}-${item.subject}-${item.startTime}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5"
+              >
+                {/* Below `sm` the period takes its own full-width line so the
+                    class/subject column keeps enough room to stay readable —
+                    the fixed `w-24` plus the nowrap time otherwise squeezed it
+                    down to ~16px on a 320px screen. */}
+                <div className="flex-shrink-0 w-full sm:w-24 min-w-0 text-xs font-semibold text-blue-600 dark:text-blue-400 truncate">
+                  {item.period || '—'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.className || '—'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subject || '—'}</p>
+                </div>
+                <div className="flex-shrink-0 text-right text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  {item.startTime && item.endTime ? `${item.startTime} – ${item.endTime}` : '—'}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            icon={CalendarDaysIcon}
+            title="No classes scheduled"
+            description="The timetable periods assigned to you will appear here."
+          />
+        )}
+      </CardSection>
 
       <CardSection title="Upcoming Homework">
         {upcomingHomework.length > 0 ? (

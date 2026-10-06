@@ -1,10 +1,10 @@
 import Teacher from '../models/teacher.model.js';
 import Student from '../models/student.model.js';
-import Timetable from '../models/timetable.model.js';
 import Admin from '../models/admin.model.js';
 import SchoolSettings from '../models/schoolSettings.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { getTeacherScope } from './teacherScope.service.js';
+import teacherClassScheduleService from './teacherClassSchedule.service.js';
 
 const classMembershipFilter = (className, academicYear) => ({
   $or: [
@@ -52,14 +52,6 @@ const resolveTeacherProfile = async (user) => {
   throw new ApiError(403, 'Only teachers can access the teacher dashboard');
 };
 
-const formatTime = (time) => {
-  if (!time) return '';
-  const [hours, minutes] = time.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-  return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
-};
-
 const getTeacherDashboardData = async (user) => {
   const teacher = await resolveTeacherProfile(user);
 
@@ -69,20 +61,9 @@ const getTeacherDashboardData = async (user) => {
 
   const academicYear = await getCurrentAcademicYear();
 
-  const [scope, teacherTimetables] = await Promise.all([
-    getTeacherScope(teacher, academicYear),
-    Timetable.find({
-      academicYear,
-      'periods.teacherId': teacher._id,
-      'periods.type': 'teaching',
-    })
-      .populate({ path: 'classId', select: 'className' })
-      .populate({ path: 'periods.subjectId', select: 'subjectName' })
-      .lean(),
-  ]);
+  const scope = await getTeacherScope(teacher, academicYear);
 
   const myClasses = [];
-  const todayClasses = [];
 
   if (scope.length > 0) {
     const classStudentCounts = await Promise.all(
@@ -107,22 +88,25 @@ const getTeacherDashboardData = async (user) => {
         });
       }
     }
-
-    for (const timetable of teacherTimetables) {
-      for (const period of timetable.periods) {
-        if (period.type !== 'teaching') continue;
-        if (period.teacherId?.toString() !== teacher._id.toString()) continue;
-
-        todayClasses.push({
-          time: `${formatTime(period.startTime)} - ${formatTime(period.endTime)}`,
-          startTime: period.startTime,
-          periodNo: period.periodNo,
-          className: timetable.classId?.className || 'Unknown Class',
-          subject: period.subjectId?.subjectName || 'Subject',
-        });
-      }
-    }
   }
+
+  // Today's Classes come from the REAL teacher timetable — the completed
+  // TimetableEntry-based Admin Timetable system, i.e. the exact same source
+  // the Teacher Class Schedule page uses. That timetable stores no day/date,
+  // so each saved period appears EXACTLY once, in chronological order, with
+  // its real Time Slot (period), class, subject and start/end times — no
+  // Monday/Tuesday/Today labels are ever generated.
+  const schedule = await teacherClassScheduleService.getMyClassSchedule(user);
+
+  const todayClasses = (schedule.timetable || [])
+    .filter((row) => row.isScheduled && !row.isBreak)
+    .map((row) => ({
+      period: row.slotLabel || '',
+      className: row.className || '',
+      subject: row.subjectName || '',
+      startTime: row.startTime || null,
+      endTime: row.endTime || null,
+    }));
 
   todayClasses.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 

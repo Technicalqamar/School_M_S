@@ -99,6 +99,7 @@ const ACADEMIC_ALLOWED = [
   'defaultLanguage', 'timeFormat',
   'weekendEnabled', 'weekendDays',
   'allowEditAfterSubmit', 'editTimeLimit', 'autoMarkAbsent',
+  'teacherManualStudentAttendance',
   'lateAllowed', 'lateGracePeriod',
   'allowLeaveMarking', 'allowHalfDayLeave',
 ];
@@ -179,6 +180,7 @@ const PREFERENCES_ALLOWED = [
   'autoLogout', 'defaultLandingPage',
   'enableNotifications', 'enableEmailNotifications',
   'enableSmsNotifications', 'enableWhatsAppNotifications',
+  'smsModuleEnabled',
   'showSchoolLogoOnLogin', 'showSchoolNameOnLogin',
   'splashEnabled', 'loaderStyle',
   'currency', 'currencySymbol',

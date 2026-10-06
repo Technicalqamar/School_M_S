@@ -9,7 +9,7 @@ const DEFAULTS = {
   academic: { currentYear: '', shift: 'Morning', language: 'English', schoolStartTime: '', schoolEndTime: '', attendanceStartTime: '', attendanceClosingTime: '' },
   branding: { adminLogo: null, smallLogo: null, signature: null, stamp: null, pdfHeader: '', pdfFooter: '', reportCardHeader: '', certificateHeader: '', idCardHeader: '', idCardFooter: '', receiptHeader: '', receiptFooter: '', footerText: '' },
   localization: { currency: '', currencySymbol: '', defaultLanguage: 'English', timeFormat: '' },
-  preferences: { autoLogout: true, defaultLandingPage: '', enableNotifications: true, enableEmailNotifications: true, enableSmsNotifications: false, enableWhatsAppNotifications: false },
+  preferences: { autoLogout: true, defaultLandingPage: '', enableNotifications: true, enableEmailNotifications: true, enableSmsNotifications: false, enableWhatsAppNotifications: false, smsModuleEnabled: false },
   attendanceRules: { allowEditAfterSubmit: false, editTimeLimit: 1, autoMarkAbsent: false, lateAllowed: false, lateGracePeriod: 5, allowLeaveMarking: true, allowHalfDayLeave: false },
   weekendSettings: { enabled: true, days: ['Saturday', 'Sunday'] },
   login: { showSchoolLogoOnLogin: true, showSchoolNameOnLogin: true, splashEnabled: true, loaderStyle: '' },
@@ -17,7 +17,7 @@ const DEFAULTS = {
 
 export const SchoolConfigProvider = ({ children }) => {
   const [config, setConfig] = useState({ ...DEFAULTS, loading: true, loaded: false });
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const loadSettings = useCallback(async () => {
     setConfig((prev) => ({ ...prev, loading: true }));
@@ -64,6 +64,7 @@ export const SchoolConfigProvider = ({ children }) => {
           enableEmailNotifications: s.enableEmailNotifications ?? true,
           enableSmsNotifications: s.enableSmsNotifications ?? false,
           enableWhatsAppNotifications: s.enableWhatsAppNotifications ?? false,
+          smsModuleEnabled: s.smsModuleEnabled ?? false,
         },
         attendanceRules: {
           allowEditAfterSubmit: s.allowEditAfterSubmit ?? false,
@@ -106,8 +107,11 @@ export const SchoolConfigProvider = ({ children }) => {
   }, [user]);
 
   useEffect(() => {
+    // While auth is still restoring the session there is no user yet, so a load
+    // started now would always fail and settle the config with defaults.
+    if (authLoading) return;
     loadSettings();
-  }, [loadSettings]);
+  }, [loadSettings, authLoading]);
 
   return (
     <SchoolConfigContext.Provider value={{ ...config, refresh: loadSettings }}>

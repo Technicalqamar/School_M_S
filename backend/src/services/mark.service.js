@@ -5,6 +5,11 @@ import Subject from '../models/subject.model.js';
 import Student from '../models/student.model.js';
 import ExamSubject from '../models/examSubject.model.js';
 import { ApiError } from '../utils/apiError.js';
+import notificationEngine from './notificationEngine.service.js';
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_FANOUT_TARGETS,
+} from '../constants/notification.constants.js';
 
 const validateId = (id, label = 'Mark') => {
   if (!mongoose.Types.ObjectId.isValid(String(id))) {
@@ -201,7 +206,7 @@ const updateMark = async (id, data) => {
 const bulkSaveMarks = async (data) => {
   const { examId, subjectId, academicYear, className, entries } = data;
 
-  await validateExamContext(examId, academicYear, className);
+  const exam = await validateExamContext(examId, academicYear, className);
   const { config } = await validateSubject(subjectId, examId, className, academicYear);
 
   const studentIds = entries.map((e) => e.studentId);
@@ -264,6 +269,19 @@ const bulkSaveMarks = async (data) => {
     }
     throw error;
   }
+
+  // Placed after the write and after every failure point above, so a rejected
+  // or partially failed save never reports a submission. The event key covers
+  // the exam/subject/class unit, so re-saving the same entry set stays silent.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.MARKS_SUBMITTED,
+    title: 'Marks submitted',
+    message: `${entries.length} mark ${entries.length === 1 ? 'entry was' : 'entries were'} saved for ${exam.name} — ${className}, ${academicYear}. ${result.upsertedCount} added, ${result.modifiedCount} updated.`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+    academicYear,
+    relatedEntity: { model: 'Exam', id: examId, label: exam.name },
+    eventKey: `${subjectId}:${className}`,
+  });
 
   return {
     matched: result.matchedCount,

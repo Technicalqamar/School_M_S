@@ -12,12 +12,19 @@ import {
   ExclamationCircleIcon,
   BanknotesIcon,
   ClockIcon,
+  BellIcon,
+  MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import { useTranslation } from '../../hooks/useLocalization';
+import useNoticeUnreadCount from '../../hooks/useNoticeUnreadCount';
+import useNotificationUnreadCount from '../../hooks/useNotificationUnreadCount';
+import QuickAccessGrid from '../../components/common/QuickAccessGrid/QuickAccessGrid';
 import studentDashboardService, { STUDENT_DASHBOARD_EMPTY_DATA } from '../../services/student/studentDashboard.service';
 import studentFeesService from '../../services/student/studentFees.service';
+import studentNoticesService from '../../services/student/studentNotices.service';
+import studentNotificationsService from '../../services/student/studentNotifications.service';
 
 const StudentDashboard = ({ portalContext }) => {
   const { user: authUser } = useAuth();
@@ -160,25 +167,78 @@ const StudentDashboard = ({ portalContext }) => {
   const homework = liveData.homework;
   const examinations = liveData.examinations;
 
+  // Real, recipient-scoped unread counts for the two communication shortcuts.
+  // Each badge is hidden at 0 and capped at 9+, and the two are never combined —
+  // this is the same Notification count the header Bell shows and the same
+  // Notice count the sidebar shows. No SMS tile exists because the Student Portal
+  // has no SMS route (SMS is an Admin-only module), and no count is invented for
+  // it.
+  const unreadNotifications = useNotificationUnreadCount(studentNotificationsService);
+  const unreadNotices = useNoticeUnreadCount(studentNoticesService);
+
+  const quickAccessItems = [
+    {
+      to: portalLink('/fees'),
+      label: t('viewFees'),
+      icon: BanknotesIcon,
+      accent: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+    },
+    {
+      to: portalLink('/homework'),
+      label: t('viewHomework'),
+      icon: ClipboardDocumentListIcon,
+      accent: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+    },
+    {
+      to: portalLink('/examination'),
+      label: t('viewExaminations'),
+      icon: AcademicCapIcon,
+      accent: 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+    },
+    {
+      to: portalLink('/class-schedule'),
+      label: t('viewClassSchedule'),
+      icon: CalendarDaysIcon,
+      accent: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+    },
+    {
+      to: portalLink('/notifications'),
+      label: t('notifications'),
+      icon: BellIcon,
+      accent: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+      badge: unreadNotifications,
+    },
+    {
+      to: portalLink('/notices'),
+      label: t('notices'),
+      icon: MegaphoneIcon,
+      accent: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+      badge: unreadNotices,
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       {/* Profile section — photo, name, ID, class, father name, academic year */}
       <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="relative h-24 md:h-28 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800">
           <div className="absolute -top-6 right-10 w-32 h-32 rounded-full bg-white/10" />
           <div className="absolute -bottom-8 right-24 w-24 h-24 rounded-full bg-white/5" />
         </div>
-        <div className="px-6 pb-6 -mt-14 relative">
-          <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-end">
-            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 ring-4 ring-white dark:ring-gray-800 flex items-center justify-center text-white font-bold text-3xl shadow-lg overflow-hidden flex-shrink-0">
+        {/* Photo on the left, details on the right at every breakpoint — the
+            row only ever switches from bottom-aligned (sm+) to top-aligned
+            (mobile) so the photo keeps overlapping the banner. */}
+        <div className="px-4 pb-6 sm:px-6 -mt-14 relative">
+          <div className="flex flex-row gap-3 sm:gap-4 items-start sm:items-end">
+            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 ring-4 ring-white dark:ring-gray-800 flex items-center justify-center text-white font-bold text-3xl shadow-lg overflow-hidden flex-shrink-0">
               {imageUrl ? (
                 <img src={imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 initials
               )}
             </div>
-            <div className="flex-1 min-w-0 text-center sm:text-left">
-              <div className="flex items-center gap-2 justify-center sm:justify-start mb-1 flex-wrap">
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-2 justify-start mb-1 flex-wrap">
                 <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">
                   {fullName || t('studentPortal')}
                 </h1>
@@ -194,7 +254,7 @@ const StudentDashboard = ({ portalContext }) => {
                 </span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">{t('studentDashboardTitle')}</p>
-              <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
+              <div className="flex flex-wrap gap-2 mt-3 justify-start">
                 {studentId && (
                   <Chip icon={<UserCircleIcon className="h-3.5 w-3.5" />}>
                     {t('studentIdLabel')}: {studentId}
@@ -217,7 +277,7 @@ const StudentDashboard = ({ portalContext }) => {
                 )}
               </div>
               {!isAdminPortalAccess && (
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 justify-center sm:justify-start">
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 justify-start">
                   <ExclamationCircleIcon className="h-4 w-4 flex-shrink-0" />
                   {t('readOnlyProfileNote')}
                 </p>
@@ -247,41 +307,25 @@ const StudentDashboard = ({ portalContext }) => {
         </div>
       )}
 
-      {/* Quick access + Fee status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider mb-4">
-            {t('quickAccess')}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <QuickAccessLink
-              to={portalLink('/fees')}
-              label={t('viewFees')}
-              icon={<BanknotesIcon className="h-5 w-5" />}
-              accent="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-            />
-            <QuickAccessLink
-              to={portalLink('/homework')}
-              label={t('viewHomework')}
-              icon={<ClipboardDocumentListIcon className="h-5 w-5" />}
-              accent="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
-            />
-            <QuickAccessLink
-              to={portalLink('/examination')}
-              label={t('viewExaminations')}
-              icon={<AcademicCapIcon className="h-5 w-5" />}
-              accent="bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-800"
-            />
-            <QuickAccessLink
-              to={portalLink('/class-schedule')}
-              label={t('viewClassSchedule')}
-              icon={<CalendarDaysIcon className="h-5 w-5" />}
-              accent="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
-            />
-          </div>
-        </section>
+      {/* Quick access — full width at every breakpoint. Inside the old 1/3
+          desktop column the horizontal tiles were squeezed until their labels
+          collapsed to zero width, which stretched this card to almost 1000px and
+          left the Fee card below with a huge empty area. Full width keeps the
+          labels readable from 1024px up, and it is exactly the layout tablet and
+          mobile already had (the old grid was single-column below `lg`, so this
+          section already spanned the full width there). */}
+      <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 sm:p-6">
+        <h2 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider mb-4">
+          {t('quickAccess')}
+        </h2>
+        <QuickAccessGrid
+          items={quickAccessItems}
+          columnsClassName="grid-cols-2 sm:grid-cols-2 lg:grid-cols-3"
+        />
+      </section>
 
-        <section className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+      {/* Fee status */}
+      <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
           <div className="flex items-center gap-2 mb-5">
             <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
               <CreditCardIcon className="h-5 w-5" />
@@ -345,8 +389,7 @@ const StudentDashboard = ({ portalContext }) => {
               )}
             </>
           )}
-        </section>
-      </div>
+      </section>
 
       {/* Homework + Examinations summaries */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -460,23 +503,30 @@ const StudentDashboard = ({ portalContext }) => {
 const Chip = ({ icon, children }) => (
   <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 max-w-full">
     <span className="shrink-0">{icon}</span>
-    <span className="truncate min-w-0">{children}</span>
+    {/* Wrap instead of truncating: the ID / class labels must stay fully
+        readable in the narrower mobile info column. */}
+    <span className="min-w-0 break-words">{children}</span>
   </span>
 );
 
-const SectionError = ({ message, onRetry }) => (
-  <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-6 text-center">
-    <ExclamationCircleIcon className="h-7 w-7 mx-auto text-red-400 dark:text-red-500 mb-2" />
-    <p className="text-sm text-red-700 dark:text-red-300 mb-3">{message}</p>
-    <button
-      type="button"
-      onClick={onRetry}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-    >
-      {t('tryAgain')}
-    </button>
-  </div>
-);
+const SectionError = ({ message, onRetry }) => {
+  // `t` is module scope here, not the dashboard's: without its own hook the
+  // fallback would throw while rendering and take the whole card down.
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-6 text-center">
+      <ExclamationCircleIcon className="h-7 w-7 mx-auto text-red-400 dark:text-red-500 mb-2" />
+      <p className="text-sm text-red-700 dark:text-red-300 mb-3">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+      >
+        {t('tryAgain')}
+      </button>
+    </div>
+  );
+};
 
 const Stat = ({ label, value }) => (
   <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2.5 border border-gray-100 dark:border-gray-600 min-w-0">
@@ -498,16 +548,5 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
-
-const QuickAccessLink = ({ to, label, icon, accent }) => (
-  <Link
-    to={to}
-    className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${accent}`}
-  >
-    {icon}
-    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex-1 min-w-0">{label}</span>
-    <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
-  </Link>
-);
 
 export default StudentDashboard;
