@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../../hooks/useLocalization';
 import {
-  MagnifyingGlassIcon, ChevronDownIcon, EyeIcon, PencilSquareIcon,
+  ChevronDownIcon, EyeIcon, PencilSquareIcon,
   TrashIcon, XMarkIcon, CalendarDaysIcon, ClockIcon, MapPinIcon,
 } from '@heroicons/react/24/outline';
 import SearchInput from '../../common/SearchInput/SearchInput';
@@ -36,7 +36,7 @@ const AllEvents = ({ onDataChange, onEditEvent }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false); // loading unused
   const [deleting, setDeleting] = useState(false);
   const yearInitializedRef = useRef(false);
 

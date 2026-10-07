@@ -87,7 +87,7 @@ const TeacherSidebar = ({ isOpen, toggleSidebar, unreadNotices = 0 }) => {
         <ul className="space-y-1">
           <li className="flex justify-center">
             <NavLink
-              to="/teacher/dashboard"
+              to="/teacher/dashboard/my-classes"
               end
               className={({ isActive }) =>
                 `flex items-center transition-all duration-200 rounded-lg ${

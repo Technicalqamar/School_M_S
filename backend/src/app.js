@@ -75,7 +75,13 @@ app.use(helmet({
 }));
 
 // CORS
-app.use(cors());
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173';
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  }),
+);
 
 // Response compression
 app.use(compression());

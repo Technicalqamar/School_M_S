@@ -45,7 +45,7 @@ const dateCircleColors = {
 
 const COLOR_PRIORITY = ['red', 'orange', 'purple', 'green', 'blue'];
 
-const CalendarView = ({ onDataChange }) => {
+const CalendarView = () => {
   const { t } = useTranslation();
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());

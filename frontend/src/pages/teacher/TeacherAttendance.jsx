@@ -12,7 +12,7 @@ import {
   PaperAirplaneIcon,
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
-import { toast } from 'react-hot-toast';
+
 import CardSection from '../../components/common/CardSection/CardSection';
 import Spinner from '../../components/common/Spinner/Spinner';
 import StatCard from '../../components/common/StatCard/StatCard';
@@ -100,7 +100,7 @@ const TeacherAttendance = () => {
   const [students, setStudents] = useState([]);
   const [studentSelections, setStudentSelections] = useState({});
   const [studentLoading, setStudentLoading] = useState(false);
-  const [studentLoaded, setStudentLoaded] = useState(false);
+  const [, setStudentLoaded] = useState(false);
   const [studentError, setStudentError] = useState('');
   const [saving, setSaving] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState(null);

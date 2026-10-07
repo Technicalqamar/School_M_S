@@ -6,7 +6,7 @@ const idCardManagementSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Student',
       required: [true, 'Student reference is required'],
-      index: true,
+      // index defined at schema level to avoid duplicates
     },
     cardNumber: {
       type: String,
@@ -130,7 +130,7 @@ const idCardManagementSchema = new mongoose.Schema(
   },
 );
 
-idCardManagementSchema.index({ student: 1 });
+idCardManagementSchema.index({ student: 1 }, { unique: false });
 idCardManagementSchema.index({ status: 1 });
 idCardManagementSchema.index({ template: 1 });
 

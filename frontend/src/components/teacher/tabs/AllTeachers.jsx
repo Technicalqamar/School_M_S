@@ -33,7 +33,7 @@ const isCurrentMonth = (d) => {
   return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
 };
 
-const AllTeachers = ({ onSuccess }) => {
+const AllTeachers = () => {
   const { t } = useTranslation();
   const statusOptions = [t('all'), t('active'), t('inactive')];
   const [view, setView] = useState('table');

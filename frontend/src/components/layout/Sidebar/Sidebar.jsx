@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, Bars3Icon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
@@ -19,16 +19,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const principalName = schoolBranding?.principalName || 'Admin Panel';
   return (
     <>
-      {!isOpen && (
-        <button
-          onClick={toggleSidebar}
-          className="fixed top-20 left-3 z-30 md:hidden p-2.5 rounded-lg bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-          aria-label="Open sidebar"
-        >
-          <Bars3Icon className="h-5 w-5" />
-        </button>
-      )}
-
       {isOpen && (
         <div
           className="fixed inset-0 top-16 bg-black/50 z-30 md:hidden transition-opacity"
@@ -260,9 +250,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   >
                     <div className="flex items-center gap-3">
                       <DocumentCheckIcon className="h-5 w-5 flex-shrink-0" />
-                      <span className="text-sm font-medium whitespace-nowrap">{t('examinationManagement')}</span>
+                      <span className="text-sm font-medium">{t('examManagement')}</span>
                     </div>
-                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${examinationOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDownIcon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${examinationOpen ? '' : 'rotate-180'}`} />
                   </button>
                   {examinationOpen && (
                     <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
@@ -443,7 +433,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                   </div>
               ) : (
                 <NavLink
-                  to="/admin/fees"
+                  to="/admin/fees/fee-structure"
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -470,7 +460,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                       <UserCircleIcon className="h-5 w-5 flex-shrink-0" />
                       <span className="text-sm font-medium">{t('userAccounts')}</span>
                     </div>
-                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${userAccountsOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${userAccountsOpen ? '' : 'rotate-180'}`} />
                   </button>
                   {userAccountsOpen && (
                     <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
@@ -528,7 +518,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                       <ChatBubbleLeftRightIcon className="h-5 w-5 flex-shrink-0" />
                       <span className="text-sm font-medium">{t('communication')}</span>
                     </div>
-                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${communicationOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${communicationOpen ? '' : 'rotate-180'}`} />
                   </button>
                   {communicationOpen && (
                     <div className="ml-3 mt-1 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-700 pl-3">

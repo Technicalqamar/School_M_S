@@ -56,7 +56,7 @@ function formatDateTime(iso) {
 
 // Shared searchable Student/Teacher picker used by both the Create and Edit forms.
 const PersonPicker = ({
-  type, query, onQueryChange, results, searching, open, onOpenChange,
+  query, onQueryChange, results, searching, open, onOpenChange,
   selected, onSelect, onClear, label, placeholder, className = '',
 }) => {
   const ref = useRef(null);

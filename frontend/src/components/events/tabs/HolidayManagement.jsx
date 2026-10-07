@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from '../../../hooks/useLocalization';
-import toast from 'react-hot-toast';
+// import toast from 'react-hot-toast';
 import {
   ChevronDownIcon, EyeIcon, PencilSquareIcon, TrashIcon,
   XMarkIcon, PlusIcon,
@@ -45,7 +45,7 @@ const HolidayManagement = ({ onDataChange, editHoliday, onEditHoliday, onClearHo
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const yearInitializedRef = useRef(false);
@@ -122,7 +122,7 @@ const HolidayManagement = ({ onDataChange, editHoliday, onEditHoliday, onClearHo
 
   const update = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const calcDays = (s, e) => {
+  const _calcDays = (s, e) => {
     if (!s || !e) return 0;
     return Math.floor((new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24)) + 1;
   };

@@ -40,7 +40,7 @@ const ROLE_STYLES = {
 
 const AuthLayout = ({ children, title, subtitle, role = 'admin', description }) => {
   const [schoolData, setSchoolData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true); // loading unused
 
   const style = ROLE_STYLES[role] || ROLE_STYLES.admin;
   const FallbackIcon = style.fallbackIcon;
