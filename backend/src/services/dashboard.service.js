@@ -53,25 +53,32 @@ const getDashboardData = async ({ academicYear: requestedYear } = {}) => {
 
   const [
     classData,
-    outstandingResult,
     studentOverviewRows,
     totalTeachers,
     newAdmissions,
     structures,
     feeStudents,
-    feeCollectionRows,
+    feePayments,
   ] = await Promise.all([
     classService.getAllClasses(),
-    feeOutstandingService.getOutstandingDues({ academicYear }),
     Student.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
     Teacher.countDocuments(),
     Student.countDocuments({ admissionDate: { $gte: monthStart, $lt: monthEnd } }),
     FeeStructure.find({ academicYear, isDeleted: { $ne: true }, status: 'Active' }),
-    Student.find({ status: 'Active' }).select('class admissionDate').lean(),
-    FeeCollection.aggregate([
-      { $match: { academicYear, voucherId: null } },
-      { $group: { _id: { feeType: '$feeType', month: '$month' }, total: { $sum: '$amountPaid' } } },
-    ]).then((rows) => rows.map((row) => ({ feeType: row._id.feeType, month: row._id.month, total: Number(row.total) || 0 }))),
+    // One read of the active students, projected to exactly the fields the
+    // dashboard needs: `class` + `admissionDate` for the expected-monthly math,
+    // `createdAt` for the fee-due admission-date fallback, `_id` for payment
+    // matching. The full active-student documents are no longer loaded here or
+    // inside the outstanding-dues engine.
+    Student.find({ status: 'Active' }).select('class admissionDate createdAt').lean(),
+    // One read of the year's payment records (voucherId null), projected to the
+    // fields the due computation and the collected totals use. Previously
+    // FeeCollection was scanned twice: once by getOutstandingDues (full
+    // documents) and once by the grouped aggregation that produced
+    // `feeCollectionRows`.
+    FeeCollection.find({ academicYear, voucherId: null })
+      .select('student feeType month exam amountPaid discount lateFine baseAmount')
+      .lean(),
   ]);
 
   const activeStudents = studentOverviewRows.find((row) => row._id === 'Active')?.count || 0;
@@ -89,12 +96,48 @@ const getDashboardData = async ({ academicYear: requestedYear } = {}) => {
     }
   }
 
+  // Collected fee totals grouped by fee type + month, equivalent to the
+  // aggregation that previously ran as a second FeeCollection scan. Both these
+  // totals and the per-student due computation now share the single projected
+  // `feePayments` read above.
+  const feeCollectionRows = [];
+  const collectedByFeeTypeMonth = new Map();
+
+  for (const payment of feePayments) {
+    const key = `${payment.feeType}|${payment.month}`;
+    collectedByFeeTypeMonth.set(key, (collectedByFeeTypeMonth.get(key) || 0) + (Number(payment.amountPaid) || 0));
+  }
+
+  for (const [key, total] of collectedByFeeTypeMonth) {
+    const separatorIndex = key.indexOf('|');
+    feeCollectionRows.push({
+      feeType: key.slice(0, separatorIndex),
+      month: key.slice(separatorIndex + 1),
+      total,
+    });
+  }
+
   const totalFeeCollected = feeCollectionRows.reduce((sum, row) => sum + row.total, 0);
 
   const collectedByMonth = new Map(
     feeCollectionRows
       .filter((row) => row.feeType === 'Monthly')
       .map((row) => [row.month, row.total]),
+  );
+
+  // The outstanding-dues total is the dashboard's only figure derived from the
+  // fee-due engine. Compute it from the structures, active students and payment
+  // records already loaded above instead of re-running the full report engine
+  // (getOutstandingDues re-queries FeeStructure, re-loads every active student
+  // in full, and re-scans FeeCollection to build per-student entries that the
+  // dashboard then discards).
+  const outstandingDuesTotal = round(
+    feeOutstandingService.computeOutstandingTotal({
+      structures,
+      students: feeStudents,
+      payments: feePayments,
+      academicYear,
+    }),
   );
 
   const monthExpected = new Array(MONTHS.length).fill(0);
@@ -147,9 +190,7 @@ const getDashboardData = async ({ academicYear: requestedYear } = {}) => {
       totalTeachers,
       totalClasses: currentYearClasses.length,
       totalFeeCollected: round(totalFeeCollected),
-      outstandingDues: round(
-        (outstandingResult.entries || []).reduce((sum, entry) => sum + entry.totalOutstanding, 0),
-      ),
+      outstandingDues: outstandingDuesTotal,
       newAdmissions,
     },
     studentOverview: {

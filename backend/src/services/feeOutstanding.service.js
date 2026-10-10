@@ -274,6 +274,64 @@ const getOutstandingDues = async ({ academicYear: requestedYear } = {}) => {
   return { academicYear, entries };
 };
 
+/**
+ * Single-number sum of the outstanding dues for the Admin Dashboard. This is
+ * NOT the report engine: it reuses `computeStudentDues` for the per-student
+ * math (keeping the fee rules in exactly one place) but expects the caller to
+ * have already loaded the fee structures, active students and payment records
+ * it needs, so the dashboard can compute its total without re-querying
+ * FeeStructure, re-loading every active student document in full, or re-scanning
+ * FeeCollection just to build entries that only get summed to one number.
+ *
+ * Equivalence to `getOutstandingDues`: fully-paid students contribute a
+ * `totalOutstanding` of 0 (identical to being excluded from the report's
+ * `entries` array), while students without a matching active fee structure are
+ * skipped exactly like the report does, so summing every student's own
+ * `totalOutstanding` produces the same total as summing the report entries.
+ *
+ * `students` are expected to be lean documents projected to `_id`, `class`,
+ * `admissionDate` and `createdAt`; `payments` lean documents projected to
+ * `student`, `feeType`, `month`, `exam`, `amountPaid`, `discount`, `lateFine`
+ * and `baseAmount`. The extra identity fields (`studentId`, `fullName`,
+ * `fatherName`) used only for report entry display are not required here.
+ */
+const computeOutstandingTotal = ({ structures, students, payments, academicYear }) => {
+  const structureByFeeClass = new Map();
+
+  for (const structure of structures) {
+    if (!structureByFeeClass.has(structure.className)) {
+      structureByFeeClass.set(structure.className, structure);
+    }
+  }
+
+  const paymentsByStudent = new Map();
+
+  for (const payment of payments) {
+    const key = String(payment.student);
+
+    if (!paymentsByStudent.has(key)) {
+      paymentsByStudent.set(key, []);
+    }
+
+    paymentsByStudent.get(key).push(payment);
+  }
+
+  let total = 0;
+
+  for (const student of students) {
+    const feeClassName = CLASS_TO_FEE_CLASS[student.class] || student.class;
+    const structure = structureByFeeClass.get(feeClassName);
+
+    if (!structure) continue;
+
+    const studentPayments = paymentsByStudent.get(String(student._id)) || [];
+
+    total += computeStudentDues(student, structure, studentPayments, academicYear).totalOutstanding;
+  }
+
+  return total;
+};
+
 const buildCurrentMonthStatus = ({ payments, currentMonthIndex, duesStartMonthIndex, monthlyFee }) => {
   const month = MONTHS[currentMonthIndex];
 
@@ -360,6 +418,7 @@ const getStudentOutstandingDues = async (studentId, academicYear) => {
 
 export default {
   getOutstandingDues,
+  computeOutstandingTotal,
   getStudentOutstandingDues,
   computeDuesStartMonthIndex,
   CLASS_TO_FEE_CLASS,
