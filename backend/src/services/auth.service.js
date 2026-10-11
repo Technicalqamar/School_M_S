@@ -112,6 +112,7 @@ const userAccountLogin = async (loginId, password) => {
       loginId: account.loginId,
       role: account.role,
       isActive: account.isActive,
+      mustChangePassword: account.mustChangePassword === true,
       lastLogin: account.lastLogin,
       teacherId: account.role === 'teacher' ? (profile.teacherId || account.loginId) : undefined,
       studentId: account.role === 'student' ? (profile.studentId || account.loginId) : undefined,

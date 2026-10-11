@@ -2,6 +2,8 @@ import Teacher from '../models/teacher.model.js';
 import Timetable from '../models/timetable.model.js';
 import { ApiError } from '../utils/apiError.js';
 import cloudinary, { configureCloudinary, CLOUDINARY_FOLDERS } from '../config/cloudinary.js';
+import userAccountService from './userAccount.service.js';
+import defaultPasswordService from './defaultPassword.service.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -38,7 +40,7 @@ const deleteFromCloudinary = async (publicId) => {
   }
 };
 
-const createTeacher = async (data, file, baseUrl = '') => {
+const createTeacher = async (data, file, baseUrl = '', performedBy = null) => {
   if (!file) {
     throw new ApiError(400, 'Teacher image is required');
   }
@@ -53,12 +55,52 @@ const createTeacher = async (data, file, baseUrl = '') => {
   teacherData.teacherImage = result.secure_url;
   teacherData.teacherImagePublicId = result.public_id;
 
+  let teacherRecord = null;
   try {
     const teacher = await Teacher.create(teacherData);
     const created = await Teacher.findById(teacher._id);
-    return created;
+    teacherRecord = created;
+
+    // Automatically create the linked portal account once the generated
+    // teacherId is available. The initial password is the Admin-configured
+    // Teacher Default Password shared by all new teacher accounts; it is hashed
+    // by the UserAccount model and returned only once below - never logged.
+    const defaultPassword = await defaultPasswordService.getDefaultPasswordForRole('teacher');
+    if (!defaultPassword) {
+      throw new ApiError(
+        400,
+        'Teacher default password is not configured. Set it in User Accounts > Create Account before adding teachers.',
+      );
+    }
+
+    await userAccountService.createAccountForProfile({
+      role: 'teacher',
+      profile: created,
+      password: defaultPassword,
+      performedBy,
+    });
+
+    return {
+      teacher: created,
+      temporaryCredentials: {
+        loginId: created.teacherId,
+        password: defaultPassword,
+      },
+    };
   } catch (error) {
-    await deleteFromCloudinary(result.public_id);
+    // Compensate so no orphaned profile or Cloudinary asset is left behind when
+    // any post-create step (including automatic account creation) fails.
+    if (teacherRecord) {
+      try {
+        await userAccountService.deleteAccountForProfile({ role: 'teacher', profileId: teacherRecord._id });
+        await deleteTeacher(teacherRecord.teacherId, performedBy);
+      } catch (cleanupError) {
+        console.error('Failed to clean up teacher after account creation failure', cleanupError);
+        await deleteFromCloudinary(result.public_id);
+      }
+    } else {
+      await deleteFromCloudinary(result.public_id);
+    }
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];

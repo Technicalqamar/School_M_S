@@ -6,6 +6,7 @@ import Input from '../../components/common/Input/Input';
 import SelectInput from '../../components/common/SelectInput/SelectInput';
 import DateInput from '../../components/common/DateInput/DateInput';
 import Alert from '../../components/common/Alert/Alert';
+import CredentialsModal from '../../components/common/CredentialsModal/CredentialsModal';
 import teacherService from '../../services/teacher/teacher.service';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
 
@@ -43,6 +44,7 @@ const AddTeacherForm = ({ onSuccess }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [credentials, setCredentials] = useState(null);
 
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
@@ -66,6 +68,11 @@ const AddTeacherForm = ({ onSuccess }) => {
 
   const handleCancel = () => {
     resetForm();
+  };
+
+  const handleCredentialsClose = () => {
+    setCredentials(null);
+    if (onSuccess) onSuccess();
   };
 
   const handleSave = async () => {
@@ -92,11 +99,19 @@ const AddTeacherForm = ({ onSuccess }) => {
       formData.append('city', form.city.trim());
       formData.append('address', form.address.trim());
 
-      await teacherService.createTeacher(formData);
+      const result = await teacherService.createTeacher(formData);
+      const creds = result?.temporaryCredentials;
 
-      toast.success('Teacher created successfully');
       resetForm();
-      if (onSuccess) onSuccess();
+      toast.success('Teacher created successfully');
+
+      // Show the generated login ID and the configured initial password once.
+      // Only after the Admin dismisses the dialog do we leave the Add Teacher tab.
+      if (creds?.loginId && creds?.password) {
+        setCredentials({ role: 'teacher', loginId: creds.loginId, password: creds.password });
+      } else if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to create teacher';
       setError(msg);
@@ -281,6 +296,14 @@ const AddTeacherForm = ({ onSuccess }) => {
           {loading ? 'Saving Teacher...' : 'Save Teacher'}
         </button>
       </div>
+
+      <CredentialsModal
+        isOpen={Boolean(credentials)}
+        onClose={handleCredentialsClose}
+        role={credentials?.role}
+        loginId={credentials?.loginId}
+        password={credentials?.password}
+      />
     </div>
   );
 };

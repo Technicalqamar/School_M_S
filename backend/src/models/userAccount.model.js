@@ -55,6 +55,10 @@ const userAccountSchema = new mongoose.Schema(
       required: true,
       default: true,
     },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
     lastLogin: {
       type: Date,
       default: null,

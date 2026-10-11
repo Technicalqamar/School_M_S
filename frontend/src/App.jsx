@@ -15,6 +15,7 @@ import AdminVerifyOTPPage from './pages/auth/AdminAuth/VerifyOTP';
 import AdminResetPasswordPage from './pages/auth/AdminAuth/ResetPassword';
 import TeacherLoginPage from './pages/auth/TeacherAuth/TeacherLogin';
 import StudentLoginPage from './pages/auth/StudentAuth/StudentLogin';
+import ChangePasswordPage from './pages/auth/ChangePassword/ChangePassword';
 import Landing from './pages/public/Landing';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherMyClasses from './pages/teacher/MyClasses';
@@ -72,13 +73,18 @@ import CreateAccountPage from './pages/admin/UserAccounts/CreateAccount';
 import AccountAccessPage from './pages/admin/UserAccounts/AccountAccess';
 
 function IndexRedirect() {
-  const { user, role, loading: authLoading, DASHBOARD_ROUTES } = useAuth();
+  const { user, role, loading: authLoading, DASHBOARD_ROUTES, CHANGE_PASSWORD_ROUTES } = useAuth();
   const { loading: configLoading, preferences } = useSchoolConfig();
 
   if (authLoading) return null;
   if (!user || !role) return <Landing />;
 
   if (role !== 'admin') {
+    // First-login portal users land on the change-password screen, never the
+    // dashboard (whose shells would fire blocked requests).
+    if (user.mustChangePassword === true && CHANGE_PASSWORD_ROUTES[role]) {
+      return <Navigate to={CHANGE_PASSWORD_ROUTES[role]} replace />;
+    }
     return <Navigate to={DASHBOARD_ROUTES[role] || '/admin/login'} replace />;
   }
 
@@ -131,6 +137,15 @@ function AppContent() {
         <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
         <Route path="/teacher/login" element={<TeacherLoginPage />} />
         <Route path="/student/login" element={<StudentLoginPage />} />
+
+        {/* First-login password change: authenticated, but deliberately NOT
+            wrapped in the portal layouts so no protected data request fires. */}
+        <Route element={<ProtectedRoute allowedRoles={['teacher']} allowPasswordChange />}>
+          <Route path="/teacher/change-password" element={<ChangePasswordPage />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={['student']} allowPasswordChange />}>
+          <Route path="/student/change-password" element={<ChangePasswordPage />} />
+        </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
           <Route path="/admin" element={<AdminLayout />}>

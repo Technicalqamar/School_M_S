@@ -12,6 +12,16 @@ const DASHBOARD_ROUTES = {
   student: '/student/dashboard',
 };
 
+// Where a first-login portal account (created with an Admin-configured default
+// password) must go to replace that temporary password. Kept role-scoped like
+// DASHBOARD_ROUTES so both portals present their own branded, layout-free
+// screen and the redirect target stays explicit. Admin accounts never carry
+// `mustChangePassword`, so no admin entry is needed.
+const CHANGE_PASSWORD_ROUTES = {
+  teacher: '/teacher/change-password',
+  student: '/student/change-password',
+};
+
 // localStorage 'user' is written with JSON.stringify at login; parse defensively
 // so a malformed cache can never throw during transient-outage recovery.
 const parseCachedUser = (raw) => {
@@ -109,6 +119,33 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('role', userRole);
   };
 
+  // Re-read the session from the server and keep both React state and the
+  // `user`/`role` caches in localStorage in step. Used after a first-login
+  // password change so the cleared `mustChangePassword` flag is visible to
+  // ProtectedRoute before we navigate to the dashboard.
+  const refreshUser = async () => {
+    const response = await authService.getMe();
+    const nextUser = response.user;
+    setUser(nextUser);
+    setRole(nextUser.role);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+    localStorage.setItem('role', nextUser.role);
+    return nextUser;
+  };
+
+  // Local-only fallback for the same transition: clear the flag on the cached
+  // user when the follow-up /auth/me cannot be reached, so a transient network
+  // hiccup after a successful password change cannot bounce the user back to
+  // the change-password screen.
+  const markPasswordChanged = () => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const nextUser = { ...prev, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(nextUser));
+      return nextUser;
+    });
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
@@ -127,7 +164,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, logout, DASHBOARD_ROUTES }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        role,
+        loading,
+        login,
+        logout,
+        refreshUser,
+        markPasswordChanged,
+        DASHBOARD_ROUTES,
+        CHANGE_PASSWORD_ROUTES,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

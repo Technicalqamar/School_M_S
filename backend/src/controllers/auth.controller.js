@@ -118,6 +118,7 @@ const getMe = asyncHandler(async (req, res) => {
       teacherId: user.teacherId || undefined,
       studentId: studentData ? studentData.studentId : (user.studentId || undefined),
       isActive: user.isActive !== undefined ? user.isActive : true,
+      mustChangePassword: user.mustChangePassword === true,
       lastLogin: user.lastLogin || undefined,
       createdAt: user.createdAt || undefined,
       student: studentData,

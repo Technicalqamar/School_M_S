@@ -64,6 +64,64 @@ const sanitizeAccount = (doc) => {
   return obj;
 };
 
+/**
+ * Core account builder shared by the manual admin flow and automatic creation
+ * triggered when a new Student/Teacher profile is created. It rejects the
+ * manual `createAccount` duplication while keeping identical duplicate checks,
+ * password hashing (model pre-save), reference linkage, and audit behavior.
+ */
+const buildAccountForProfile = async ({
+  role,
+  profile,
+  password,
+  performedBy = null,
+  fields = {},
+  mustChangePassword = false,
+}) => {
+  if (!profile || profile._id == null) {
+    throw new ApiError(400, 'Linked profile is required to create an account');
+  }
+
+  const referenceModel = role === 'student' ? 'Student' : 'Teacher';
+  const loginId = role === 'student' ? profile.studentId : profile.teacherId;
+  if (!loginId) {
+    throw new ApiError(400, `${role === 'student' ? 'Student' : 'Teacher'} ID is not available for this record`);
+  }
+
+  const [existingByLoginId, existingByRef] = await Promise.all([
+    UserAccount.findOne({ loginId }),
+    UserAccount.findOne({ referenceId: profile._id, referenceModel }),
+  ]);
+
+  if (existingByLoginId || existingByRef) {
+    throw new ApiError(409, 'An account already exists for this Student/Teacher');
+  }
+
+  if (!password || password.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters');
+  }
+
+  const account = await UserAccount.create({
+    loginId,
+    role,
+    referenceId: profile._id,
+    referenceModel,
+    password,
+    email: profile.email || undefined,
+    phone: (role === 'student' ? profile.fatherPhone : profile.phoneNumber) || undefined,
+    fullName: profile.fullName,
+    profileImage: (role === 'student' ? profile.studentImage : profile.teacherImage) || undefined,
+    profileImagePublicId: (role === 'student' ? profile.studentImagePublicId : profile.teacherImagePublicId) || undefined,
+    isActive: true,
+    mustChangePassword,
+    ...fields,
+  });
+
+  await logAudit('CREATE', account, performedBy);
+
+  return account;
+};
+
 const createAccount = async (data, performedBy) => {
   const { role, referenceId, password, email, phone, fullName, profileImage, profileImagePublicId, isActive } = data;
 
@@ -81,43 +139,57 @@ const createAccount = async (data, performedBy) => {
     throw new ApiError(404, `${role === 'student' ? 'Student' : 'Teacher'} not found`);
   }
 
-  const loginId = role === 'student' ? profile.studentId : profile.teacherId;
-  if (!loginId) {
-    throw new ApiError(400, `${role === 'student' ? 'Student' : 'Teacher'} ID is not available for this record`);
-  }
-
-  const [existingByLoginId, existingByRef] = await Promise.all([
-    UserAccount.findOne({ loginId }),
-    UserAccount.findOne({ referenceId, referenceModel: role === 'student' ? 'Student' : 'Teacher' }),
-  ]);
-
-  if (existingByLoginId || existingByRef) {
-    throw new ApiError(409, 'An account already exists for this Student/Teacher');
-  }
-
-  if (!password || password.length < 6) {
-    throw new ApiError(400, 'Password must be at least 6 characters');
-  }
-
-  const account = await UserAccount.create({
-    loginId,
+  const account = await buildAccountForProfile({
     role,
-    referenceId,
-    referenceModel: role === 'student' ? 'Student' : 'Teacher',
+    profile,
     password,
-    email: email || undefined,
-    phone: phone || undefined,
-    fullName: fullName || profile.fullName,
-    profileImage: profileImage || undefined,
-    profileImagePublicId: profileImagePublicId || undefined,
-    isActive: isActive !== undefined ? isActive : true,
+    performedBy,
+    fields: {
+      email: email || undefined,
+      phone: phone || undefined,
+      fullName: fullName || profile.fullName,
+      profileImage: profileImage || undefined,
+      profileImagePublicId: profileImagePublicId || undefined,
+      isActive: isActive !== undefined ? isActive : true,
+    },
   });
-
-  await logAudit('CREATE', account, performedBy);
 
   const fresh = await UserAccount.findById(account._id);
   const resolvedProfile = await resolveProfile(fresh);
   return buildAccountResponse(fresh, resolvedProfile);
+};
+
+/**
+ * Create a portal account from a freshly created Student/Teacher profile.
+ * Used automatically by the student/teacher creation services. The caller is
+ * responsible for resolving the configured default password and returning it
+ * once to the creator.
+ */
+const createAccountForProfile = async ({ role, profile, password, performedBy = null, mustChangePassword = true }) => {
+  if (!['student', 'teacher'].includes(role)) {
+    throw new ApiError(400, 'Role must be student or teacher');
+  }
+
+  return buildAccountForProfile({
+    role,
+    profile,
+    password,
+    performedBy,
+    mustChangePassword,
+    fields: {},
+  });
+};
+
+/**
+ * Remove the portal account linked to a profile. Used as part of compensating
+ * cleanup when automatic account creation fails after a profile was inserted.
+ */
+const deleteAccountForProfile = async ({ role, profileId }) => {
+  const referenceModel = role === 'student' ? 'Student' : 'Teacher';
+  const account = await UserAccount.findOne({ referenceId: profileId, referenceModel });
+  if (!account) return false;
+  await UserAccount.deleteOne({ _id: account._id });
+  return true;
 };
 
 const getAllAccounts = async (query) => {
@@ -227,6 +299,8 @@ const updatePassword = async (accountId, newPassword, performedBy) => {
   }
 
   account.password = newPassword;
+  // Reset by an admin requires the user to set a new password on next login.
+  account.mustChangePassword = true;
   await account.save();
 
   await logAudit('UPDATE', account, performedBy);
@@ -284,6 +358,8 @@ const getAvailableProfiles = async (role, search = '') => {
 
 export default {
   createAccount,
+  createAccountForProfile,
+  deleteAccountForProfile,
   getAllAccounts,
   getAccountById,
   updateAccount,

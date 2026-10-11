@@ -2,12 +2,15 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import studentService from '../services/student.service.js';
 
 const createStudent = asyncHandler(async (req, res) => {
-  const student = await studentService.createStudent(req.body, req.file);
+  const result = await studentService.createStudent(req.body, req.file, '', req.user?._id);
 
   return res.status(201).json({
     success: true,
     message: 'Student created successfully',
-    student,
+    student: result.student,
+    ...(result.temporaryCredentials
+      ? { temporaryCredentials: result.temporaryCredentials }
+      : {}),
   });
 });
 

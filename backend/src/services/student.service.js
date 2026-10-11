@@ -10,6 +10,8 @@ import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
 } from '../constants/notification.constants.js';
+import userAccountService from './userAccount.service.js';
+import defaultPasswordService from './defaultPassword.service.js';
 
 const uploadToCloudinary = (buffer, originalname) => {
   configureCloudinary();
@@ -60,11 +62,7 @@ const normalizeStudentIdTerm = (term) => {
   return null;
 };
 
-const createStudent = async (data, file, baseUrl = '') => {
-  if (!file) {
-    throw new ApiError(400, 'Student image is required');
-  }
-
+const createStudent = async (data, file, baseUrl = '', performedBy = null) => {
   const studentData = { ...data };
   delete studentData.studentId;
   delete studentData.admissionNumber;
@@ -80,16 +78,44 @@ const createStudent = async (data, file, baseUrl = '') => {
     },
   ];
 
-  const result = await uploadToCloudinary(file.buffer, file.originalname);
-  studentData.studentImage = result.secure_url;
-  studentData.studentImagePublicId = result.public_id;
+  // Photo is optional. When provided it is uploaded to Cloudinary and its URL is
+  // stored; when skipped, `studentImage` falls back to its schema default.
+  let uploadedPublicId = null;
+  if (file) {
+    const result = await uploadToCloudinary(file.buffer, file.originalname);
+    studentData.studentImage = result.secure_url;
+    studentData.studentImagePublicId = result.public_id;
+    uploadedPublicId = result.public_id;
+  }
 
+  let studentRecord = null;
   try {
     const savedStudent = await Student.create(studentData);
     const student = await Student.findById(savedStudent._id);
+    studentRecord = student;
 
-    // Runs only after the student row exists. notify() swallows its own errors,
-    // so a notification problem can never fail (or roll back) the admission.
+    // Automatically create the linked portal account once the generated
+    // studentId is available. The initial password is the Admin-configured
+    // Student Default Password shared by all new student accounts; it is hashed
+    // by the UserAccount model and returned only once below - never logged.
+    const defaultPassword = await defaultPasswordService.getDefaultPasswordForRole('student');
+    if (!defaultPassword) {
+      throw new ApiError(
+        400,
+        'Student default password is not configured. Set it in User Accounts > Create Account before adding students.',
+      );
+    }
+
+    await userAccountService.createAccountForProfile({
+      role: 'student',
+      profile: student,
+      password: defaultPassword,
+      performedBy,
+    });
+
+    // Runs only after the student row and its portal account exist. notify()
+    // swallows its own errors, so a notification problem can never fail (or
+    // roll back) the admission.
     await notificationEngine.notify({
       type: NOTIFICATION_TYPES.STUDENT_CREATED,
       title: 'New student admitted',
@@ -99,9 +125,27 @@ const createStudent = async (data, file, baseUrl = '') => {
       relatedEntity: { model: 'Student', id: student._id, label: student.studentId },
     });
 
-    return student;
+    return {
+      student,
+      temporaryCredentials: {
+        loginId: student.studentId,
+        password: defaultPassword,
+      },
+    };
   } catch (error) {
-    await deleteFromCloudinary(result.public_id);
+    // Compensate so no orphaned profile or Cloudinary asset is left behind when
+    // any post-create step (including automatic account creation) fails.
+    if (studentRecord) {
+      try {
+        await userAccountService.deleteAccountForProfile({ role: 'student', profileId: studentRecord._id });
+        await deleteStudent(studentRecord.studentId, performedBy);
+      } catch (cleanupError) {
+        console.error('Failed to clean up student after account creation failure', cleanupError);
+        if (uploadedPublicId) await deleteFromCloudinary(uploadedPublicId);
+      }
+    } else if (uploadedPublicId) {
+      await deleteFromCloudinary(uploadedPublicId);
+    }
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];

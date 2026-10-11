@@ -24,10 +24,6 @@ const validateCreateStudent = (req, res, next) => {
     status,
   } = req.body;
 
-  if (!req.file) {
-    throw new ApiError(400, 'Student image is required');
-  }
-
   if (!fullName || !fullName.trim()) {
     throw new ApiError(400, 'Full name is required');
   }

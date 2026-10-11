@@ -40,6 +40,16 @@ const userAccountService = {
     const response = await api.get(`/user-accounts/available/${role}`, { params: { search } });
     return response.data;
   },
+
+  getDefaultPasswords: async () => {
+    const response = await api.get('/default-passwords');
+    return response.data;
+  },
+
+  updateDefaultPasswords: async (data) => {
+    const response = await api.put('/default-passwords', data);
+    return response.data;
+  },
 };
 
 export default userAccountService;

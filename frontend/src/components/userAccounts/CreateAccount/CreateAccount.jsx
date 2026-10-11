@@ -7,6 +7,7 @@ import SelectInput from '../../common/SelectInput/SelectInput';
 import Button from '../../common/Button/Button';
 import SearchUserInput from './SearchUserInput';
 import userAccountService from '../../../services/userAccount/userAccount.service';
+import DefaultPasswordsCard from './DefaultPasswordsCard';
 
 const DEFAULT_PASSWORD = '12345678';
 
@@ -106,6 +107,8 @@ const CreateAccount = () => {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('createAccount')}</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('createAccountSubtitle')}</p>
       </div>
+
+      <DefaultPasswordsCard />
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
         <form onSubmit={handleSubmit}>

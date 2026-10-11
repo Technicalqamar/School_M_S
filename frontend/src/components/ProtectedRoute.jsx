@@ -8,8 +8,8 @@ const LOGIN_ROUTES = {
   student: '/student/login',
 };
 
-const ProtectedRoute = ({ allowedRoles }) => {
-  const { user, role, loading, DASHBOARD_ROUTES } = useAuth();
+const ProtectedRoute = ({ allowedRoles, allowPasswordChange = false }) => {
+  const { user, role, loading, DASHBOARD_ROUTES, CHANGE_PASSWORD_ROUTES } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -25,8 +25,25 @@ const ProtectedRoute = ({ allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {
+    // A signed-in first-login account that reaches the *other* portal's route is
+    // sent to its own change-password screen rather than the dashboard, which
+    // would immediately fire blocked requests.
+    if (user.mustChangePassword === true && CHANGE_PASSWORD_ROUTES[role]) {
+      return <Navigate to={CHANGE_PASSWORD_ROUTES[role]} replace />;
+    }
     const redirectPath = LOGIN_ROUTES[role] || DASHBOARD_ROUTES[role] || '/admin/login';
     return <Navigate to={redirectPath} replace />;
+  }
+
+  // First-login enforcement: while the temporary password is pending, no
+  // protected portal route (dashboard, classes, fees, timetable, ...) may render.
+  // The dedicated change-password screen opts out with `allowPasswordChange`.
+  if (
+    !allowPasswordChange &&
+    user.mustChangePassword === true &&
+    CHANGE_PASSWORD_ROUTES[role]
+  ) {
+    return <Navigate to={CHANGE_PASSWORD_ROUTES[role]} replace />;
   }
 
   return <Outlet />;

@@ -4,6 +4,23 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import Admin from '../models/admin.model.js';
 import UserAccount from '../models/userAccount.model.js';
 
+// Portal accounts created automatically with a temporary password must change it
+// before using the portal. Until then their access is limited to the exact paths
+// needed to complete that flow (fetch session/flag, log out, change password).
+// The refresh-token route is public (no `protect`), so it needs no entry here.
+const PASSWORD_CHANGE_ALLOWLIST = ['/auth/me', '/auth/logout', '/profile/change-password'];
+
+// Tokens issued for admin-authorized portal access (see portalAccess.service) must
+// keep working regardless of the flag; Admin sessions are never affected because
+// Admin records do not carry `mustChangePassword`.
+const PORTAL_ACCESS_TYPE = 'admin_portal_access';
+
+const isPasswordChangePending = (req) =>
+  req.user &&
+  req.user.mustChangePassword === true &&
+  req.accessType !== PORTAL_ACCESS_TYPE &&
+  !PASSWORD_CHANGE_ALLOWLIST.some((path) => req.originalUrl.includes(path));
+
 const protect = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -31,6 +48,13 @@ const protect = asyncHandler(async (req, res, next) => {
 
     if (!req.user) {
       throw new ApiError(401, 'Account not found');
+    }
+
+    if (isPasswordChangePending(req)) {
+      throw new ApiError(
+        403,
+        'Temporary password must be changed before accessing the portal',
+      );
     }
 
     return next();

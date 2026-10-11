@@ -346,6 +346,12 @@ export const changePassword = asyncHandler(async (req, res) => {
     }
 
     account.password = newPassword;
+    // Completing a self-service password change clears the first-login
+    // restriction. Legacy Admin-based accounts have no such flag, so the guard
+    // leaves them untouched.
+    if (account.mustChangePassword === true) {
+      account.mustChangePassword = false;
+    }
     await account.save();
 
     return res.status(200).json({

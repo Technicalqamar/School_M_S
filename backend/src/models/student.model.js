@@ -11,7 +11,7 @@ const studentSchema = new mongoose.Schema(
   {
     studentImage: {
       type: String,
-      required: [true, 'Student image is required'],
+      default: '',
     },
     studentImagePublicId: {
       type: String,

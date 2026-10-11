@@ -7,6 +7,7 @@ import Input from '../../components/common/Input/Input';
 import SelectInput from '../../components/common/SelectInput/SelectInput';
 import DateInput from '../../components/common/DateInput/DateInput';
 import Alert from '../../components/common/Alert/Alert';
+import CredentialsModal from '../../components/common/CredentialsModal/CredentialsModal';
 import studentService from '../../services/student/student.service';
 import { CLASS_NAMES } from '../../utils/classNames';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
@@ -38,6 +39,7 @@ const AddStudentForm = ({ onSuccess }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [credentials, setCredentials] = useState(null);
 
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
@@ -63,6 +65,11 @@ const AddStudentForm = ({ onSuccess }) => {
     resetForm();
   };
 
+  const handleCredentialsClose = () => {
+    setCredentials(null);
+    if (onSuccess) onSuccess();
+  };
+
   const handleSave = async () => {
     setLoading(true);
     setError('');
@@ -86,11 +93,19 @@ const AddStudentForm = ({ onSuccess }) => {
       formData.append('city', form.city.trim());
       formData.append('address', form.address.trim());
 
-      await studentService.createStudent(formData);
+      const result = await studentService.createStudent(formData);
+      const creds = result?.temporaryCredentials;
 
-      toast.success(t('savedSuccessfully'));
       resetForm();
-      if (onSuccess) onSuccess();
+      toast.success(t('savedSuccessfully'));
+
+      // Show the generated login ID and the configured initial password once.
+      // Only after the Admin dismisses the dialog do we leave the Add Student tab.
+      if (creds?.loginId && creds?.password) {
+        setCredentials({ role: 'student', loginId: creds.loginId, password: creds.password });
+      } else if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       const msg = err.response?.data?.message || t('failedToSave');
       setError(msg);
@@ -258,6 +273,14 @@ const AddStudentForm = ({ onSuccess }) => {
           {loading ? t('saving') : t('save')}
         </button>
       </div>
+
+      <CredentialsModal
+        isOpen={Boolean(credentials)}
+        onClose={handleCredentialsClose}
+        role={credentials?.role}
+        loginId={credentials?.loginId}
+        password={credentials?.password}
+      />
     </div>
   );
 };
