@@ -16,7 +16,7 @@ const userAccountSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['student', 'teacher'],
+      enum: ['student', 'teacher', 'receptionist'],
       required: [true, 'Role is required'],
     },
     referenceId: {
@@ -27,7 +27,7 @@ const userAccountSchema = new mongoose.Schema(
     referenceModel: {
       type: String,
       required: [true, 'Reference model is required'],
-      enum: ['Student', 'Teacher'],
+      enum: ['Student', 'Teacher', 'Receptionist'],
     },
     fullName: {
       type: String,

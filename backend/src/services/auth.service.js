@@ -1,6 +1,7 @@
 import Admin from '../models/admin.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
+import Receptionist from '../models/receptionist.model.js';
 import UserAccount from '../models/userAccount.model.js';
 import RefreshToken from '../models/refreshToken.model.js';
 import EmailChangeRequest from '../models/emailChangeRequest.model.js';
@@ -74,9 +75,28 @@ const buildUserResponse = (user) => ({
   studentId: user.studentId || undefined,
 });
 
-const userAccountLogin = async (loginId, password) => {
+// Role -> linked profile model. The receptionist has its own profile document
+// so its permission set lives in trusted server-side data.
+const PROFILE_MODELS = {
+  student: Student,
+  teacher: Teacher,
+  receptionist: Receptionist,
+};
+
+/**
+ * Shared portal login for Student/Teacher/Receptionist accounts.
+ *
+ * `expectedRole` (optional) scopes the login to a single portal: when supplied,
+ * an account whose role differs is treated as "not found" so, for example, a
+ * Receptionist account can never authenticate through the Teacher endpoint.
+ */
+const userAccountLogin = async (loginId, password, expectedRole = null) => {
   const account = await UserAccount.findOne({ loginId }).select('+password');
   if (!account) {
+    return null;
+  }
+
+  if (expectedRole && account.role !== expectedRole) {
     return null;
   }
 
@@ -88,8 +108,8 @@ const userAccountLogin = async (loginId, password) => {
     throw new ApiError(403, 'Your account has been deactivated. Contact the administration.');
   }
 
-  const profileModel = account.role === 'student' ? Student : Teacher;
-  const profile = await profileModel.findById(account.referenceId);
+  const profileModel = PROFILE_MODELS[account.role];
+  const profile = profileModel ? await profileModel.findById(account.referenceId) : null;
 
   if (!profile) {
     throw new ApiError(403, 'Linked profile not found. Contact the administration.');
@@ -116,6 +136,8 @@ const userAccountLogin = async (loginId, password) => {
       lastLogin: account.lastLogin,
       teacherId: account.role === 'teacher' ? (profile.teacherId || account.loginId) : undefined,
       studentId: account.role === 'student' ? (profile.studentId || account.loginId) : undefined,
+      receptionistId: account.role === 'receptionist' ? (profile.receptionistId || account.loginId) : undefined,
+      permissions: account.role === 'receptionist' ? (profile.permissions || []) : undefined,
       profile: profile || null,
     },
     accessToken,
@@ -143,9 +165,8 @@ const adminLogin = async (email, password) => {
 };
 
 const teacherLogin = async (teacherId, password) => {
-  const portal = await userAccountLogin(teacherId, password);
+  const portal = await userAccountLogin(teacherId, password, 'teacher');
   if (portal) {
-    portal.user.role = 'teacher';
     return portal;
   }
 
@@ -171,9 +192,8 @@ const teacherLogin = async (teacherId, password) => {
 };
 
 const studentLogin = async (studentId, password) => {
-  const portal = await userAccountLogin(studentId, password);
+  const portal = await userAccountLogin(studentId, password, 'student');
   if (portal) {
-    portal.user.role = 'student';
     return portal;
   }
 
@@ -205,6 +225,17 @@ const studentLogin = async (studentId, password) => {
     accessToken,
     refreshToken,
   };
+};
+
+const receptionistLogin = async (receptionistId, password) => {
+  // Receptionist accounts are UserAccount-only (no legacy Admin record), and the
+  // login is scoped to the receptionist role so no other role can enter this
+  // portal through this endpoint.
+  const portal = await userAccountLogin(receptionistId, password, 'receptionist');
+  if (!portal) {
+    throw new ApiError(401, 'Receptionist ID not found');
+  }
+  return portal;
 };
 
 const forgotPassword = async (email) => {
@@ -642,7 +673,7 @@ const completePasswordChange = async (userId, newPassword, meta = {}) => {
 const logoutUser = async (reqUser) => {
   if (!reqUser) return;
 
-  const isPortalUser = reqUser.role === 'student' || reqUser.role === 'teacher';
+  const isPortalUser = reqUser.role === 'student' || reqUser.role === 'teacher' || reqUser.role === 'receptionist';
   if (!isPortalUser) return;
 
   try {
@@ -660,6 +691,7 @@ export default {
   adminLogin,
   teacherLogin,
   studentLogin,
+  receptionistLogin,
   userAccountLogin,
   logoutUser,
   forgotPassword,

@@ -16,6 +16,11 @@ const authService = {
     return response.data;
   },
 
+  receptionistLogin: async (receptionistId, password) => {
+    const response = await api.post('/auth/receptionist/login', { receptionistId, password });
+    return response.data;
+  },
+
   logout: async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     const response = await api.post('/auth/logout', { refreshToken });

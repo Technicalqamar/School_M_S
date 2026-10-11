@@ -70,7 +70,8 @@ const CredentialsModal = ({ isOpen, onClose, role = 'student', loginId, password
   const { t } = useTranslation();
   if (!isOpen) return null;
 
-  const roleLabel = role === 'teacher' ? t('roleTeacher') : t('roleStudent');
+  const roleLabel =
+    role === 'teacher' ? t('roleTeacher') : role === 'receptionist' ? 'Receptionist' : t('roleStudent');
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('credentialsTitle')}>

@@ -101,7 +101,8 @@ const ChangePassword = () => {
   };
 
   const isTeacher = role === 'teacher';
-  const portalLabel = isTeacher ? 'Teacher' : 'Student';
+  const isReceptionist = role === 'receptionist';
+  const portalLabel = isTeacher ? 'Teacher' : isReceptionist ? 'Receptionist' : 'Student';
 
   return (
     <AuthLayout

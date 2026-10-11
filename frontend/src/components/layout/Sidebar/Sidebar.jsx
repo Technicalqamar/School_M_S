@@ -468,6 +468,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         { to: '/admin/accounts/all', label: 'allAccounts' },
                         { to: '/admin/accounts/create', label: 'createAccount' },
                         { to: '/admin/accounts/access', label: 'accountAccess' },
+                        { to: '/admin/accounts/receptionists', label: 'receptionistAccounts' },
                       ].map((item) => (
                         <NavLink
                           key={item.to}

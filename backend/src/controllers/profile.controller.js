@@ -45,6 +45,8 @@ const isTeacherUser = (req) => req.user && req.user.role === 'teacher';
 
 const isStudentUser = (req) => req.user && req.user.role === 'student';
 
+const isReceptionistUser = (req) => req.user && req.user.role === 'receptionist';
+
 const isPortalAccount = (req) => Boolean(req.user && req.user.referenceId && req.user.referenceModel);
 
 const buildAdminResponse = (admin) => ({
@@ -328,7 +330,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'New password must be at least 6 characters');
   }
 
-  if (isTeacherUser(req) || isStudentUser(req)) {
+  if (isTeacherUser(req) || isStudentUser(req) || isReceptionistUser(req)) {
     let account;
     if (isPortalAccount(req)) {
       account = await UserAccount.findById(req.user._id).select('+password');

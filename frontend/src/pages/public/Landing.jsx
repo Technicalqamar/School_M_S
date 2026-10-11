@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   UsersIcon,
@@ -18,20 +17,18 @@ import {
   ShieldCheckIcon,
   DevicePhoneMobileIcon,
   RectangleStackIcon,
-  ClockIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import LandingLayout from '../../components/public/LandingLayout';
 import ProductPreview from '../../components/public/ProductPreview';
-import ComingSoonDialog from '../../components/public/ComingSoonDialog';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import '../../components/public/landing.css';
 
 // Public entry points. Admin is intentionally absent: no Admin card, button,
 // link, or CTA exists anywhere on this page, and the Admin login route is
-// unchanged. Receptionist is a UI-only "coming soon" placeholder — no route,
-// role, API, or authorization is created for it.
+// unchanged. The Receptionist portal is a real route (`/receptionist/login`)
+// backed by a live role, so its card links to it like the Student/Teacher cards.
 
 const HERO_CHIPS = ['Students', 'Teachers', 'Attendance', 'Fees', 'Examinations', 'Reports'];
 
@@ -97,6 +94,13 @@ const PORTALS = [
     Icon: AcademicCapIcon,
     iconStyles: 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white',
   },
+  {
+    to: '/receptionist/login',
+    title: 'Receptionist Login',
+    subtitle: 'Front-desk access to student records, admissions, and fees.',
+    Icon: RectangleStackIcon,
+    iconStyles: 'bg-amber-100 text-amber-600 group-hover:bg-amber-600 group-hover:text-white',
+  },
 ];
 
 const Landing = () => {
@@ -106,8 +110,6 @@ const Landing = () => {
   const schoolName = schoolInfo?.name || 'School Management System';
   const logo = schoolInfo?.logo ? getImageUrl(schoolInfo.logo) : null;
   const principalName = schoolInfo?.principalName || '';
-
-  const [receptionistOpen, setReceptionistOpen] = useState(false);
 
   return (
     <LandingLayout schoolName={schoolName} logo={logo} principalName={principalName}>
@@ -347,42 +349,9 @@ const Landing = () => {
                 </span>
               </Link>
             ))}
-
-            <button
-              type="button"
-              onClick={() => setReceptionistOpen(true)}
-              aria-haspopup="dialog"
-              className="group relative flex w-full flex-col items-start gap-4 rounded-2xl border border-dashed border-gray-300 bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-gray-600 dark:bg-gray-900 dark:hover:border-amber-500"
-            >
-              <span className="absolute right-4 top-4 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                Coming soon
-              </span>
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                <ClockIcon className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-base font-semibold">Receptionist Login</span>
-                <span className="mt-1 block text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                  Front-desk access is currently in development.
-                </span>
-              </span>
-              <span className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-amber-700 dark:text-amber-400">
-                Learn more
-                <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
-              </span>
-            </button>
           </div>
         </div>
       </section>
-
-      <ComingSoonDialog
-        isOpen={receptionistOpen}
-        onClose={() => setReceptionistOpen(false)}
-        title="Receptionist login is coming soon"
-      >
-        Receptionist access is still being developed and is not available yet. Please use the
-        Student or Teacher portal, or contact the school office.
-      </ComingSoonDialog>
     </LandingLayout>
   );
 };

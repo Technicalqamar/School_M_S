@@ -10,6 +10,7 @@ const DASHBOARD_ROUTES = {
   admin: '/admin',
   teacher: '/teacher/dashboard',
   student: '/student/dashboard',
+  receptionist: '/receptionist/dashboard',
 };
 
 // Where a first-login portal account (created with an Admin-configured default
@@ -20,6 +21,7 @@ const DASHBOARD_ROUTES = {
 const CHANGE_PASSWORD_ROUTES = {
   teacher: '/teacher/change-password',
   student: '/student/change-password',
+  receptionist: '/receptionist/change-password',
 };
 
 // localStorage 'user' is written with JSON.stringify at login; parse defensively

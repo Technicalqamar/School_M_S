@@ -32,6 +32,10 @@ const defaultPasswordSettingSchema = new mongoose.Schema(
       type: encryptedSecretSchema,
       default: null,
     },
+    receptionist: {
+      type: encryptedSecretSchema,
+      default: null,
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',

@@ -3,6 +3,7 @@ import {
   adminLogin,
   teacherLogin,
   studentLogin,
+  receptionistLogin,
   refreshToken,
   logout,
   getMe,
@@ -21,6 +22,7 @@ import {
   validateAdminLogin,
   validateTeacherLogin,
   validateStudentLogin,
+  validateReceptionistLogin,
   validateForgotPassword,
   validateVerifyOtp,
   validateResetPassword,
@@ -34,6 +36,7 @@ const router = express.Router();
 router.post('/admin/login', validateAdminLogin, adminLogin);
 router.post('/teacher/login', validateTeacherLogin, teacherLogin);
 router.post('/student/login', validateStudentLogin, studentLogin);
+router.post('/receptionist/login', validateReceptionistLogin, receptionistLogin);
 
 // Refresh token
 router.post('/refresh-token', refreshToken);

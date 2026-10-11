@@ -3,6 +3,7 @@ import { ApiError } from '../utils/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import Admin from '../models/admin.model.js';
 import UserAccount from '../models/userAccount.model.js';
+import Receptionist from '../models/receptionist.model.js';
 
 // Portal accounts created automatically with a temporary password must change it
 // before using the portal. Until then their access is limited to the exact paths
@@ -48,6 +49,15 @@ const protect = asyncHandler(async (req, res, next) => {
 
     if (!req.user) {
       throw new ApiError(401, 'Account not found');
+    }
+
+    // Attach the Receptionist profile (which owns the permission set) from
+    // trusted server-side data. Permission middleware and portal handlers read
+    // permissions from here, never from the request payload or JWT claims.
+    if (req.user.role === 'receptionist' && req.user.referenceId) {
+      req.receptionistProfile = await Receptionist.findById(req.user.referenceId).select(
+        'receptionistId status permissions',
+      );
     }
 
     if (isPasswordChangePending(req)) {

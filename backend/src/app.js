@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import userAccountRoutes from './routes/userAccount.routes.js';
 import defaultPasswordRoutes from './routes/defaultPassword.routes.js';
+import receptionistRoutes from './routes/receptionist.routes.js';
+import receptionistPortalRoutes from './routes/receptionistPortal.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import studentPromotionRoutes from './routes/studentPromotion.routes.js';
@@ -103,6 +105,8 @@ const authLimiter = rateLimit({
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/user-accounts', userAccountRoutes);
 app.use('/api/v1/default-passwords', defaultPasswordRoutes);
+app.use('/api/v1/receptionists', receptionistRoutes);
+app.use('/api/v1/receptionist', receptionistPortalRoutes);
 app.use('/api/v1/profile', profileRoutes);
 app.use('/api/v1/students', studentPromotionRoutes);
 app.use('/api/v1/students', studentRoutes);

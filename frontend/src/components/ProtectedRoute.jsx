@@ -6,6 +6,7 @@ const LOGIN_ROUTES = {
   admin: '/admin/login',
   teacher: '/teacher/login',
   student: '/student/login',
+  receptionist: '/receptionist/login',
 };
 
 const ProtectedRoute = ({ allowedRoles, allowPasswordChange = false }) => {
@@ -21,6 +22,7 @@ const ProtectedRoute = ({ allowedRoles, allowPasswordChange = false }) => {
     if (path.startsWith('/admin')) return <Navigate to={LOGIN_ROUTES.admin} replace />;
     if (path.startsWith('/teacher')) return <Navigate to={LOGIN_ROUTES.teacher} replace />;
     if (path.startsWith('/student')) return <Navigate to={LOGIN_ROUTES.student} replace />;
+    if (path.startsWith('/receptionist')) return <Navigate to={LOGIN_ROUTES.receptionist} replace />;
     return <Navigate to={LOGIN_ROUTES.admin} replace />;
   }
 

@@ -17,14 +17,15 @@ const checkPassword = (value, label) => {
 };
 
 const validateUpdateDefaultPasswords = (req, res, next) => {
-  const { student, teacher } = req.body || {};
+  const { student, teacher, receptionist } = req.body || {};
 
-  if (student === undefined && teacher === undefined) {
-    throw new ApiError(400, 'Provide a student and/or teacher default password to update');
+  if (student === undefined && teacher === undefined && receptionist === undefined) {
+    throw new ApiError(400, 'Provide a student, teacher and/or receptionist default password to update');
   }
 
   checkPassword(student, 'Student default password');
   checkPassword(teacher, 'Teacher default password');
+  checkPassword(receptionist, 'Receptionist default password');
 
   next();
 };

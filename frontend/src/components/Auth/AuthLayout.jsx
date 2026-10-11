@@ -27,6 +27,14 @@ const ROLE_STYLES = {
     mobileAccent: 'from-violet-600 to-violet-800',
     mobileRing: 'ring-violet-400/50',
   },
+  receptionist: {
+    fallbackIcon: ShieldCheckIcon,
+    description: 'Receptionist Portal — Front-desk access to student records, admissions and fees.',
+    leftBg: 'from-amber-900 via-amber-800 to-amber-900',
+    accentBar: 'bg-amber-400',
+    mobileAccent: 'from-amber-600 to-amber-800',
+    mobileRing: 'ring-amber-400/50',
+  },
   // Public landing page (portal chooser) — branding only, no portal is implied.
   portal: {
     fallbackIcon: ShieldCheckIcon,

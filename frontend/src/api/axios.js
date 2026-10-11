@@ -192,7 +192,7 @@ api.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         localStorage.removeItem('role');
-        const loginRoutes = { admin: '/admin/login', teacher: '/teacher/login', student: '/student/login' };
+        const loginRoutes = { admin: '/admin/login', teacher: '/teacher/login', student: '/student/login', receptionist: '/receptionist/login' };
         window.location.replace(loginRoutes[userRole] || '/admin/login');
         return Promise.reject(refreshError);
       }

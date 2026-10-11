@@ -3,7 +3,7 @@ import AuditLog from '../models/auditLog.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { encryptSecret, decryptSecret } from '../utils/secretCrypto.js';
 
-const ROLES = ['student', 'teacher'];
+const ROLES = ['student', 'teacher', 'receptionist'];
 const MIN_LENGTH = 6;
 const MAX_LENGTH = 128;
 
@@ -44,6 +44,7 @@ const getDefaultPasswords = async () => {
   return {
     student: decryptRole(doc, 'student'),
     teacher: decryptRole(doc, 'teacher'),
+    receptionist: decryptRole(doc, 'receptionist'),
   };
 };
 
@@ -53,7 +54,7 @@ const getDefaultPasswords = async () => {
  */
 const getDefaultPasswordForRole = async (role) => {
   if (!ROLES.includes(role)) {
-    throw new ApiError(400, 'Role must be student or teacher');
+    throw new ApiError(400, 'Role must be student, teacher or receptionist');
   }
   const doc = await DefaultPasswordSetting.getSettings();
   return decryptRole(doc, role);
@@ -63,22 +64,25 @@ const getDefaultPasswordForRole = async (role) => {
  * Create/update the configured default passwords. Only the provided roles are
  * changed; the plaintext is encrypted before persistence and is never logged.
  */
-const updateDefaultPasswords = async ({ student, teacher, performedBy = null } = {}) => {
+const updateDefaultPasswords = async ({ student, teacher, receptionist, performedBy = null } = {}) => {
   const provided = [];
   if (student !== undefined) provided.push('student');
   if (teacher !== undefined) provided.push('teacher');
+  if (receptionist !== undefined) provided.push('receptionist');
 
   if (provided.length === 0) {
-    throw new ApiError(400, 'Provide a student and/or teacher default password to update');
+    throw new ApiError(400, 'Provide a student, teacher and/or receptionist default password to update');
   }
 
   assertPassword(student, 'Student default password');
   assertPassword(teacher, 'Teacher default password');
+  assertPassword(receptionist, 'Receptionist default password');
 
   const doc = await DefaultPasswordSetting.getSettings();
 
   if (student !== undefined) doc.student = encryptSecret(student);
   if (teacher !== undefined) doc.teacher = encryptSecret(teacher);
+  if (receptionist !== undefined) doc.receptionist = encryptSecret(receptionist);
   doc.updatedBy = performedBy || null;
 
   await doc.save();
@@ -98,6 +102,7 @@ const updateDefaultPasswords = async ({ student, teacher, performedBy = null } =
   return {
     student: decryptRole(doc, 'student'),
     teacher: decryptRole(doc, 'teacher'),
+    receptionist: decryptRole(doc, 'receptionist'),
   };
 };
 

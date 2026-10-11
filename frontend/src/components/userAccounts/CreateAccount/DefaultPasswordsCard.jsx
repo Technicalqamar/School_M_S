@@ -7,9 +7,9 @@ import Button from '../../common/Button/Button';
 import userAccountService from '../../../services/userAccount/userAccount.service';
 
 const MIN_LENGTH = 6;
-const FIELDS = ['student', 'teacher'];
+const FIELDS = ['student', 'teacher', 'receptionist'];
 
-const emptyValues = { student: '', teacher: '' };
+const emptyValues = { student: '', teacher: '', receptionist: '' };
 
 // Admin-configurable default passwords used for automatically created portal
 // accounts. Loads the current values on mount, lets the Admin update them with
@@ -18,7 +18,7 @@ const DefaultPasswordsCard = () => {
   const { t } = useTranslation();
   const [values, setValues] = useState(emptyValues);
   const [saved, setSaved] = useState(emptyValues);
-  const [configured, setConfigured] = useState({ student: false, teacher: false });
+  const [configured, setConfigured] = useState({ student: false, teacher: false, receptionist: false });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,10 +30,10 @@ const DefaultPasswordsCard = () => {
       try {
         const res = await userAccountService.getDefaultPasswords();
         const data = res?.data || {};
-        const next = { student: data.student || '', teacher: data.teacher || '' };
+        const next = { student: data.student || '', teacher: data.teacher || '', receptionist: data.receptionist || '' };
         setValues(next);
         setSaved(next);
-        setConfigured({ student: Boolean(data.student), teacher: Boolean(data.teacher) });
+        setConfigured({ student: Boolean(data.student), teacher: Boolean(data.teacher), receptionist: Boolean(data.receptionist) });
       } catch (err) {
         toast.error(err.response?.data?.message || t('defaultPasswordsLoadError'));
       } finally {
@@ -81,10 +81,10 @@ const DefaultPasswordsCard = () => {
     try {
       const res = await userAccountService.updateDefaultPasswords(payload);
       const data = res?.data || {};
-      const next = { student: data.student || '', teacher: data.teacher || '' };
+      const next = { student: data.student || '', teacher: data.teacher || '', receptionist: data.receptionist || '' };
       setValues(next);
       setSaved(next);
-      setConfigured({ student: Boolean(data.student), teacher: Boolean(data.teacher) });
+      setConfigured({ student: Boolean(data.student), teacher: Boolean(data.teacher), receptionist: Boolean(data.receptionist) });
       setErrors({});
       toast.success(res?.message || t('defaultPasswordsSaved'));
     } catch (err) {
@@ -94,7 +94,10 @@ const DefaultPasswordsCard = () => {
     }
   };
 
-  const dirty = values.student !== saved.student || values.teacher !== saved.teacher;
+  const dirty =
+    values.student !== saved.student ||
+    values.teacher !== saved.teacher ||
+    values.receptionist !== saved.receptionist;
   const busy = loading || saving;
 
   const renderField = (field, labelKey, notSetKey) => (
@@ -130,6 +133,7 @@ const DefaultPasswordsCard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 mt-5">
         {renderField('student', 'studentDefaultPassword', 'studentDefaultPasswordNotSet')}
         {renderField('teacher', 'teacherDefaultPassword', 'teacherDefaultPasswordNotSet')}
+        {renderField('receptionist', 'receptionistDefaultPassword', 'receptionistDefaultPasswordNotSet')}
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-2 pt-4 border-t border-gray-200 dark:border-gray-700">

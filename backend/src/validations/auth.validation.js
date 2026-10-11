@@ -28,6 +28,14 @@ const validateStudentLogin = (req, res, next) => {
   next();
 };
 
+const validateReceptionistLogin = (req, res, next) => {
+  const { receptionistId, password } = req.body;
+  if (!receptionistId || !password) {
+    throw new ApiError(400, 'Receptionist ID and password are required');
+  }
+  next();
+};
+
 const validateForgotPassword = (req, res, next) => {
   const { email } = req.body;
   if (!email) {
@@ -62,6 +70,7 @@ export {
   validateAdminLogin,
   validateTeacherLogin,
   validateStudentLogin,
+  validateReceptionistLogin,
   validateForgotPassword,
   validateVerifyOtp,
   validateResetPassword,

@@ -71,6 +71,13 @@ import ResultHistoryPage from './pages/admin/ExamManagement/ResultHistory';
 import AllAccountsPage from './pages/admin/UserAccounts/AllAccounts';
 import CreateAccountPage from './pages/admin/UserAccounts/CreateAccount';
 import AccountAccessPage from './pages/admin/UserAccounts/AccountAccess';
+import ReceptionistAccountsPage from './pages/admin/UserAccounts/ReceptionistAccounts';
+import ReceptionistLoginPage from './pages/auth/ReceptionistAuth/ReceptionistLogin';
+import ReceptionistLayout from './layouts/ReceptionistLayout';
+import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
+import StudentRecords from './pages/receptionist/StudentRecords';
+import ModuleUnavailable from './pages/receptionist/ModuleUnavailable';
+import RequirePermission from './components/receptionist/RequirePermission';
 
 function IndexRedirect() {
   const { user, role, loading: authLoading, DASHBOARD_ROUTES, CHANGE_PASSWORD_ROUTES } = useAuth();
@@ -137,6 +144,7 @@ function AppContent() {
         <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
         <Route path="/teacher/login" element={<TeacherLoginPage />} />
         <Route path="/student/login" element={<StudentLoginPage />} />
+        <Route path="/receptionist/login" element={<ReceptionistLoginPage />} />
 
         {/* First-login password change: authenticated, but deliberately NOT
             wrapped in the portal layouts so no protected data request fires. */}
@@ -145,6 +153,9 @@ function AppContent() {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={['student']} allowPasswordChange />}>
           <Route path="/student/change-password" element={<ChangePasswordPage />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={['receptionist']} allowPasswordChange />}>
+          <Route path="/receptionist/change-password" element={<ChangePasswordPage />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
@@ -179,6 +190,7 @@ function AppContent() {
             <Route path="accounts/all" element={<AllAccountsPage />} />
             <Route path="accounts/create" element={<CreateAccountPage />} />
             <Route path="accounts/access" element={<AccountAccessPage />} />
+            <Route path="accounts/receptionists" element={<ReceptionistAccountsPage />} />
           </Route>
         </Route>
 
@@ -208,6 +220,75 @@ function AppContent() {
             <Route path="attendance" element={<StudentAttendance />} />
             <Route path="notifications" element={<StudentNotifications />} />
             <Route path="notices" element={<StudentNotices />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={['receptionist']} />}>
+          <Route path="/receptionist/dashboard" element={<ReceptionistLayout />}>
+            <Route
+              index
+              element={
+                <RequirePermission permission="dashboard.view">
+                  <ReceptionistDashboard />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="students"
+              element={
+                <RequirePermission permission="students.view">
+                  <StudentRecords />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="admissions"
+              element={
+                <RequirePermission permission="admissions.view">
+                  <ModuleUnavailable title="Admissions" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="attendance"
+              element={
+                <RequirePermission permission="attendance.view">
+                  <ModuleUnavailable title="Student Attendance" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="fees"
+              element={
+                <RequirePermission permission="fees.view">
+                  <ModuleUnavailable title="Fees & Fee Receipts" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="parents"
+              element={
+                <RequirePermission permission="parents.view">
+                  <ModuleUnavailable title="Parent / Contact Records" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <RequirePermission permission="reports.view">
+                  <ModuleUnavailable title="Reports & Exports" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="notices"
+              element={
+                <RequirePermission permission="notices.view">
+                  <ModuleUnavailable title="Notices & Communication" />
+                </RequirePermission>
+              }
+            />
           </Route>
         </Route>
 

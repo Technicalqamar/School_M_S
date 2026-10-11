@@ -2,6 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/apiError.js';
 import authService from '../services/auth.service.js';
 import Student from '../models/student.model.js';
+import Receptionist from '../models/receptionist.model.js';
 import Admin from '../models/admin.model.js';
 
 const adminLogin = asyncHandler(async (req, res) => {
@@ -55,6 +56,23 @@ const studentLogin = asyncHandler(async (req, res) => {
   });
 });
 
+const receptionistLogin = asyncHandler(async (req, res) => {
+  const { receptionistId, password } = req.body;
+  if (!receptionistId || !password) {
+    throw new ApiError(400, 'Receptionist ID and password are required');
+  }
+
+  const result = await authService.receptionistLogin(receptionistId, password);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Receptionist login successful',
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    user: result.user,
+  });
+});
+
 const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken: token } = req.body;
   if (!token) {
@@ -95,6 +113,16 @@ const getMe = asyncHandler(async (req, res) => {
     studentData = await Student.findById(user.referenceId);
   }
 
+  // Receptionist accounts carry their permission set on the linked profile.
+  // It is read from the database on every call so a permission change is
+  // reflected on the next request, never from client-supplied state.
+  let receptionistData = null;
+  if (user.role === 'receptionist' && user.referenceId) {
+    receptionistData = await Receptionist.findById(user.referenceId).select(
+      'receptionistId fullName email phone status permissions',
+    );
+  }
+
   let accessInfo;
   if (req.accessType === 'admin_portal_access' && req.accessAdminId) {
     const admin = await Admin.findById(req.accessAdminId).select('fullName email');
@@ -117,6 +145,8 @@ const getMe = asyncHandler(async (req, res) => {
       role: user.role,
       teacherId: user.teacherId || undefined,
       studentId: studentData ? studentData.studentId : (user.studentId || undefined),
+      receptionistId: user.role === 'receptionist' ? (receptionistData?.receptionistId || user.loginId) : undefined,
+      permissions: user.role === 'receptionist' ? (receptionistData?.permissions || []) : undefined,
       isActive: user.isActive !== undefined ? user.isActive : true,
       mustChangePassword: user.mustChangePassword === true,
       lastLogin: user.lastLogin || undefined,
@@ -300,6 +330,7 @@ export {
   adminLogin,
   teacherLogin,
   studentLogin,
+  receptionistLogin,
   refreshToken,
   logout,
   getMe,

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import UserAccount from '../models/userAccount.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
+import Receptionist from '../models/receptionist.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import { ApiError } from '../utils/apiError.js';
 import bcrypt from 'bcryptjs';
@@ -10,15 +11,29 @@ const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$
 
 const getProfileModel = (role) => (role === 'student' ? Student : Teacher);
 
+// All three portal roles resolve through their linked profile. Receptionist has
+// its own profile document so the shared listing helpers stay correct.
+const PROFILE_MODELS = {
+  student: Student,
+  teacher: Teacher,
+  receptionist: Receptionist,
+};
+
 const resolveProfile = async (account) => {
-  const Model = getProfileModel(account.role);
+  const Model = PROFILE_MODELS[account.role];
+  if (!Model) return null;
   const profile = await Model.findById(account.referenceId).lean();
   return profile || null;
 };
 
 const buildAccountResponse = (account, profile = null) => {
   const isStudent = account.role === 'student';
-  const profileId = isStudent ? profile?.studentId : profile?.teacherId;
+  const isTeacher = account.role === 'teacher';
+  const profileId = isStudent
+    ? profile?.studentId
+    : isTeacher
+      ? profile?.teacherId
+      : profile?.receptionistId;
 
   return {
     id: account._id,
@@ -200,7 +215,14 @@ const getAllAccounts = async (query) => {
   const skip = (page - 1) * limit;
 
   const filter = {};
-  if (role && role !== 'all') filter.role = role;
+  if (role && role !== 'all') {
+    filter.role = role;
+  } else {
+    // The generic account listing covers the Student/Teacher portals only.
+    // Receptionist accounts are managed in their own dedicated section, so they
+    // never appear here (and cannot be edited/deleted through this page).
+    filter.role = { $in: ['student', 'teacher'] };
+  }
   if (accountStatus) {
     if (accountStatus === 'Active') filter.isActive = true;
     else if (accountStatus === 'Inactive') filter.isActive = false;
