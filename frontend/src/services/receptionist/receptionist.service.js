@@ -61,6 +61,30 @@ const portal = {
     const response = await api.get(`/receptionist/students/${studentId}`);
     return response.data;
   },
+
+  getNotices: async (params = {}) => {
+    const response = await api.get('/receptionist/notices', { params });
+    return response.data;
+  },
+
+  getNoticeById: async (id) => {
+    const response = await api.get(`/receptionist/notices/${id}`);
+    return response.data;
+  },
+
+  getAttendanceByStudent: async (studentId, academicYear) => {
+    const response = await api.get('/receptionist/attendance', {
+      params: { studentId, academicYear },
+    });
+    return response.data;
+  },
+
+  getFeesByStudent: async (studentId, academicYear) => {
+    const response = await api.get('/receptionist/fees', {
+      params: { studentId, academicYear },
+    });
+    return response.data;
+  },
 };
 
 const receptionistService = { ...admin, ...portal };

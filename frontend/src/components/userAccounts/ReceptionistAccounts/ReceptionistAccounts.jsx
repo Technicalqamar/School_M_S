@@ -8,11 +8,14 @@ import {
   PowerIcon,
   TrashIcon,
   ShieldCheckIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import receptionistService from '../../../services/receptionist/receptionist.service';
 import {
   RECEPTIONIST_PERMISSION_MODULES,
   DEFAULT_RECEPTIONIST_PERMISSIONS,
+  buildPermissionKey,
+  expandModulePermissions,
 } from '../../../constants/receptionistPermissions';
 import Input from '../../common/Input/Input';
 import Button from '../../common/Button/Button';
@@ -27,33 +30,161 @@ const STATUS_BADGE = {
   Inactive: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
 };
 
-const PermissionEditor = ({ selected, onToggle, disabled = false }) => (
-  <div className="space-y-4">
-    {RECEPTIONIST_PERMISSION_MODULES.map((module) => (
-      <div key={module.key} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-        <p className="text-sm font-semibold text-gray-800 dark:text-white">{module.label}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{module.description}</p>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {module.actions.map((action) => {
-            const key = `${module.key}.${action.key}`;
-            return (
-              <label key={key} className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400"
-                  checked={selected.includes(key)}
-                  disabled={disabled}
-                  onChange={() => onToggle(key)}
-                />
-                {action.label}
-              </label>
-            );
-          })}
-        </div>
+/**
+ * Permission editor built from the real catalogue (`RECEPTIONIST_PERMISSION_MODULES`).
+ *
+ * - Every module heading is a collapsible section.
+ * - Available modules expose a "Full Access - <Module>" checkbox next to the
+ *   individual action checkboxes. Full Access selects exactly the module's
+ *   supported actions (never Admin-only operations); clearing it removes the
+ *   whole module's keys and leaves other modules untouched.
+ * - Unavailable modules are shown honestly as "Not yet available" and cannot be
+ *   granted (the backend rejects their keys too).
+ * - A partial selection renders the Full Access checkbox indeterminate.
+ */
+const PermissionEditor = ({ selected, onChange, disabled = false }) => {
+  const [expanded, setExpanded] = useState(() =>
+    Object.fromEntries(RECEPTIONIST_PERMISSION_MODULES.map((module) => [module.key, true])),
+  );
+
+  const toggleSection = (key) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const togglePermission = (key) => {
+    if (disabled) return;
+    onChange(
+      selected.includes(key) ? selected.filter((permission) => permission !== key) : [...selected, key],
+    );
+  };
+
+  const toggleFullAccess = (module) => {
+    if (disabled) return;
+    const keys = expandModulePermissions(module.key);
+    if (keys.length === 0) return;
+    const allSelected = keys.every((key) => selected.includes(key));
+    const next = allSelected
+      ? selected.filter((key) => !keys.includes(key))
+      : [...new Set([...selected, ...keys])];
+    onChange(next);
+  };
+
+  const totalSelected = selected.length;
+  const totalAvailable = RECEPTIONIST_PERMISSION_MODULES.filter((module) => module.available).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+        <span>
+          {totalSelected} of {totalAvailable} module permission{totalAvailable === 1 ? '' : 's'} selected
+        </span>
       </div>
-    ))}
-  </div>
-);
+
+      {RECEPTIONIST_PERMISSION_MODULES.map((module) => {
+        if (!module.available) {
+          return (
+            <div
+              key={module.key}
+              className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/30 px-3 py-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{module.label}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{module.description}</p>
+                </div>
+                <span className="inline-flex rounded-full bg-gray-200 dark:bg-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                  Not yet available
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        const keys = expandModulePermissions(module.key);
+        const selectedCount = keys.filter((key) => selected.includes(key)).length;
+        const isFull = keys.length > 0 && selectedCount === keys.length;
+        const partial = selectedCount > 0 && selectedCount < keys.length;
+        const isExpanded = expanded[module.key];
+
+        return (
+          <div
+            key={module.key}
+            className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => toggleSection(module.key)}
+                className="flex items-center gap-2 text-left flex-1 min-w-0 cursor-pointer"
+                aria-expanded={isExpanded}
+              >
+                <ChevronDownIcon
+                  className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${
+                    isExpanded ? 'rotate-0' : '-rotate-90'
+                  }`}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-gray-800 dark:text-white">
+                    {module.label}
+                  </span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">
+                    {module.description}
+                  </span>
+                </span>
+              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  {selectedCount}/{keys.length}
+                </span>
+                <label
+                  className={`inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 ${
+                    disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
+                  title={`Full Access — ${module.label}: grants every supported action for this module`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                    checked={isFull}
+                    disabled={disabled}
+                    ref={(el) => {
+                      if (el) el.indeterminate = partial && !isFull;
+                    }}
+                    onChange={() => toggleFullAccess(module)}
+                  />
+                  <span className="whitespace-nowrap">Full Access — {module.label}</span>
+                </label>
+              </div>
+            </div>
+
+            {isExpanded && (
+              <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20 px-4 py-3">
+                {keys.map((key) => (
+                  <label
+                    key={key}
+                    className={`inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 ${
+                      disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      checked={selected.includes(key)}
+                      disabled={disabled}
+                      onChange={() => togglePermission(key)}
+                    />
+                    {module.actions.find((action) => buildPermissionKey(module.key, action.key) === key)?.label ||
+                      key}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const ReceptionistAccounts = () => {
   const [rows, setRows] = useState([]);
@@ -68,6 +199,9 @@ const ReceptionistAccounts = () => {
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  const [permModal, setPermModal] = useState({ open: false, target: null, saved: [], draft: [] });
+  const [savingPermissions, setSavingPermissions] = useState(false);
 
   const [resetModal, setResetModal] = useState({ open: false, target: null });
   const [resetPassword, setResetPassword] = useState('');
@@ -128,13 +262,8 @@ const ReceptionistAccounts = () => {
     setFormModal({ open: true, mode: 'edit', target: row });
   };
 
-  const togglePermission = (key) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(key)
-        ? prev.permissions.filter((permission) => permission !== key)
-        : [...prev.permissions, key],
-    }));
+  const setFormPermissions = (permissions) => {
+    setFormData((prev) => ({ ...prev, permissions }));
   };
 
   const validateForm = () => {
@@ -181,6 +310,31 @@ const ReceptionistAccounts = () => {
       toast.error(err.response?.data?.message || 'Unable to save receptionist account.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openPermissions = (row) => {
+    const saved = [...(row.permissions || [])].sort();
+    setPermModal({ open: true, target: row, saved, draft: [...saved] });
+  };
+
+  const permissionsDirty = () => {
+    const saved = [...(permModal.saved || [])].sort();
+    const draft = [...(permModal.draft || [])].sort();
+    return saved.length !== draft.length || saved.some((key, index) => key !== draft[index]);
+  };
+
+  const handleSavePermissions = async () => {
+    setSavingPermissions(true);
+    try {
+      await receptionistService.updateReceptionistPermissions(permModal.target.id, permModal.draft);
+      toast.success('Permissions saved successfully');
+      setPermModal({ open: false, target: null, saved: [], draft: [] });
+      load(search, statusFilter, page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to save permissions.');
+    } finally {
+      setSavingPermissions(false);
     }
   };
 
@@ -330,6 +484,13 @@ const ReceptionistAccounts = () => {
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={() => openPermissions(row)}
+                          title="Manage permissions"
+                          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        >
+                          <ShieldCheckIcon className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => openEdit(row)}
                           title="Edit"
                           className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -430,7 +591,7 @@ const ReceptionistAccounts = () => {
 
           <div className="mb-4">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permissions</p>
-            <PermissionEditor selected={formData.permissions} onToggle={togglePermission} />
+            <PermissionEditor selected={formData.permissions} onChange={setFormPermissions} />
           </div>
 
           {formModal.mode === 'create' && (
@@ -452,6 +613,39 @@ const ReceptionistAccounts = () => {
           </Button>
           <Button variant="primary" onClick={handleSave} loading={saving}>
             {formModal.mode === 'create' ? 'Create Account' : 'Save Changes'}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Dedicated Permissions modal */}
+      <Modal
+        isOpen={permModal.open}
+        onClose={() => setPermModal({ open: false, target: null, saved: [], draft: [] })}
+        title={`Permissions — ${permModal.target?.fullName || ''}`}
+        maxWidth="max-w-2xl"
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Grant the receptionist access to the modules below. Permissions apply immediately on their
+          next request and are enforced on the server.
+        </p>
+
+        {permissionsDirty() && (
+          <div className="mb-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+            Unsaved changes — you have modified this receptionist&apos;s permissions.
+          </div>
+        )}
+
+        <PermissionEditor
+          selected={permModal.draft}
+          onChange={(next) => setPermModal((prev) => ({ ...prev, draft: next }))}
+        />
+
+        <div className="flex gap-3 pt-2">
+          <Button variant="secondary" onClick={() => setPermModal({ open: false, target: null, saved: [], draft: [] })}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSavePermissions} loading={savingPermissions} disabled={!permissionsDirty()}>
+            Save Permissions
           </Button>
         </div>
       </Modal>

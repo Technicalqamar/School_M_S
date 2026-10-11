@@ -76,6 +76,9 @@ import ReceptionistLoginPage from './pages/auth/ReceptionistAuth/ReceptionistLog
 import ReceptionistLayout from './layouts/ReceptionistLayout';
 import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import StudentRecords from './pages/receptionist/StudentRecords';
+import ReceptionistAttendance from './pages/receptionist/ReceptionistAttendance';
+import ReceptionistFees from './pages/receptionist/ReceptionistFees';
+import ReceptionistNotices from './pages/receptionist/ReceptionistNotices';
 import ModuleUnavailable from './pages/receptionist/ModuleUnavailable';
 import RequirePermission from './components/receptionist/RequirePermission';
 
@@ -224,9 +227,14 @@ function AppContent() {
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['receptionist']} />}>
-          <Route path="/receptionist/dashboard" element={<ReceptionistLayout />}>
+          {/* Pathless parent: each module owns a real URL (/receptionist/students,
+              /receptionist/attendance, ...) that matches the sidebar navigation.
+              Previously these were nested under /receptionist/dashboard, so every
+              sidebar link resolved to an unmatched route and bounced the user back
+              to the dashboard. */}
+          <Route element={<ReceptionistLayout />}>
             <Route
-              index
+              path="/receptionist/dashboard"
               element={
                 <RequirePermission permission="dashboard.view">
                   <ReceptionistDashboard />
@@ -234,7 +242,7 @@ function AppContent() {
               }
             />
             <Route
-              path="students"
+              path="/receptionist/students"
               element={
                 <RequirePermission permission="students.view">
                   <StudentRecords />
@@ -242,53 +250,40 @@ function AppContent() {
               }
             />
             <Route
-              path="admissions"
-              element={
-                <RequirePermission permission="admissions.view">
-                  <ModuleUnavailable title="Admissions" />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="attendance"
+              path="/receptionist/attendance"
               element={
                 <RequirePermission permission="attendance.view">
-                  <ModuleUnavailable title="Student Attendance" />
+                  <ReceptionistAttendance />
                 </RequirePermission>
               }
             />
             <Route
-              path="fees"
+              path="/receptionist/fees"
               element={
                 <RequirePermission permission="fees.view">
-                  <ModuleUnavailable title="Fees & Fee Receipts" />
+                  <ReceptionistFees />
                 </RequirePermission>
               }
             />
             <Route
-              path="parents"
-              element={
-                <RequirePermission permission="parents.view">
-                  <ModuleUnavailable title="Parent / Contact Records" />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="reports"
-              element={
-                <RequirePermission permission="reports.view">
-                  <ModuleUnavailable title="Reports & Exports" />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="notices"
+              path="/receptionist/notices"
               element={
                 <RequirePermission permission="notices.view">
-                  <ModuleUnavailable title="Notices & Communication" />
+                  <ReceptionistNotices />
                 </RequirePermission>
               }
             />
+
+            {/* Genuinely unimplemented modules keep an honest "not available" page
+                instead of silently bouncing to the dashboard. They are static
+                face pages only - no backend endpoint exists behind them, so a
+                receptionist can never read real data here. */}
+            <Route path="/receptionist/admissions" element={<ModuleUnavailable title="Admissions" />} />
+            <Route
+              path="/receptionist/parents"
+              element={<ModuleUnavailable title="Parent / Contact Records" />}
+            />
+            <Route path="/receptionist/reports" element={<ModuleUnavailable title="Reports & Exports" />} />
           </Route>
         </Route>
 

@@ -4,10 +4,14 @@ import UserAccount from '../models/userAccount.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
 import Class from '../models/class.model.js';
+import SchoolSettings from '../models/schoolSettings.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import { ApiError } from '../utils/apiError.js';
 import defaultPasswordService from './defaultPassword.service.js';
 import studentService from './student.service.js';
+import noticeService from './notice.service.js';
+import studentAttendanceService from './studentAttendance.service.js';
+import feeOutstandingService from './feeOutstanding.service.js';
 import {
   DEFAULT_RECEPTIONIST_PERMISSIONS,
   sanitizePermissions,
@@ -340,6 +344,116 @@ const getPortalStudent = async (studentId) => {
   return student;
 };
 
+// -- Notices / Attendance / Fees (read-only portal modules) -------------------
+//
+// Each of these is reached only through a route gated by `requirePermission`,
+// so the backend independently checks the receptionist's permission before the
+// handler runs. The data itself comes from the existing school services; the
+// receptionist portal never bypasses their internal rules.
+
+const getCurrentAcademicYear = async () => {
+  const settings = await SchoolSettings.getSettings();
+  if (settings?.currentAcademicYear && /^\d{4}$/.test(settings.currentAcademicYear)) {
+    return settings.currentAcademicYear;
+  }
+  return String(new Date().getFullYear());
+};
+
+// Receptionists see notices a front desk handles in person: school-wide
+// announcements and legacy Staff-targeted ones. They are read-only - the
+// Receptionist portal never marks notices read or publishes new ones.
+const RECEPTIONIST_NOTICE_AUDIENCES = ['All', 'Staff'];
+
+const getPortalNotices = async (query = {}) => {
+  const academicYear = await getCurrentAcademicYear();
+  return noticeService.listNoticesForPortal({
+    audiences: RECEPTIONIST_NOTICE_AUDIENCES,
+    academicYear,
+    search: query.search,
+    page: query.page,
+    limit: query.limit,
+  });
+};
+
+const getPortalNotice = async (id) => {
+  const academicYear = await getCurrentAcademicYear();
+  return noticeService.getNoticeForPortal(id, {
+    audiences: RECEPTIONIST_NOTICE_AUDIENCES,
+    academicYear,
+  });
+};
+
+const assertStudentIdPresent = (studentId) => {
+  if (!studentId || typeof studentId !== 'string' || !String(studentId).trim()) {
+    throw new ApiError(400, 'Student ID is required');
+  }
+};
+
+const getPortalAttendance = async ({ studentId, academicYear } = {}) => {
+  assertStudentIdPresent(studentId);
+
+  const student = await Student.findOne({ studentId: String(studentId).trim() })
+    .select('studentId fullName class status fatherName')
+    .lean();
+  if (!student) {
+    throw new ApiError(404, 'Student not found');
+  }
+
+  const effectiveYear = academicYear || (await getCurrentAcademicYear());
+  const records = await studentAttendanceService.getAttendanceByStudent(
+    student._id,
+    effectiveYear,
+  );
+
+  return {
+    student: {
+      studentId: student.studentId,
+      fullName: student.fullName,
+      class: student.class,
+      status: student.status,
+      fatherName: student.fatherName || null,
+    },
+    attendance: records.map((record) => ({
+      _id: record._id,
+      date: record.date,
+      status: record.status,
+      method: record.method || 'Manual',
+      checkIn: record.checkIn || null,
+      checkOut: record.checkOut || null,
+      remarks: record.remarks || '',
+    })),
+    academicYear: effectiveYear,
+  };
+};
+
+const getPortalFees = async ({ studentId, academicYear } = {}) => {
+  assertStudentIdPresent(studentId);
+
+  const student = await Student.findOne({ studentId: String(studentId).trim() })
+    .select('studentId fullName class status fatherName')
+    .lean();
+  if (!student) {
+    throw new ApiError(404, 'Student not found');
+  }
+
+  const effectiveYear = academicYear || (await getCurrentAcademicYear());
+  const fees = await feeOutstandingService.getStudentOutstandingDues(
+    student._id,
+    effectiveYear,
+  );
+
+  return {
+    student: {
+      studentId: student.studentId,
+      fullName: student.fullName,
+      class: student.class,
+      status: student.status,
+      fatherName: student.fatherName || null,
+    },
+    fees,
+  };
+};
+
 export default {
   createReceptionist,
   getReceptionists,
@@ -352,4 +466,8 @@ export default {
   getPortalDashboard,
   getPortalStudents,
   getPortalStudent,
+  getPortalNotices,
+  getPortalNotice,
+  getPortalAttendance,
+  getPortalFees,
 };

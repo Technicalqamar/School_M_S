@@ -146,6 +146,46 @@ const getStudentByStudentId = asyncHandler(async (req, res) => {
   });
 });
 
+const getPortalNotices = asyncHandler(async (req, res) => {
+  const result = await receptionistService.getPortalNotices(req.query);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Notices fetched successfully',
+    data: result,
+  });
+});
+
+const getPortalNoticeById = asyncHandler(async (req, res) => {
+  const notice = await receptionistService.getPortalNotice(req.params.id);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Notice fetched successfully',
+    data: { notice },
+  });
+});
+
+const getPortalAttendance = asyncHandler(async (req, res) => {
+  const result = await receptionistService.getPortalAttendance(req.query);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Attendance fetched successfully',
+    data: result,
+  });
+});
+
+const getPortalFees = asyncHandler(async (req, res) => {
+  const result = await receptionistService.getPortalFees(req.query);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Fee dues fetched successfully',
+    data: result,
+  });
+});
+
 export {
   createReceptionist,
   getAllReceptionists,
@@ -158,4 +198,8 @@ export {
   getDashboard,
   getStudents,
   getStudentByStudentId,
+  getPortalNotices,
+  getPortalNoticeById,
+  getPortalAttendance,
+  getPortalFees,
 };
