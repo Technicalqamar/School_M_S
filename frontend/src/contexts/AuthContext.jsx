@@ -1,5 +1,8 @@
 import { createContext, useState, useContext, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import authService from '../services/auth/auth.service';
+import { isRequestTimeout, isNetworkError } from '../api/axios';
+import { t as translate } from '../locales/index';
 
 const AuthContext = createContext();
 
@@ -7,6 +10,27 @@ const DASHBOARD_ROUTES = {
   admin: '/admin',
   teacher: '/teacher/dashboard',
   student: '/student/dashboard',
+};
+
+// localStorage 'user' is written with JSON.stringify at login; parse defensively
+// so a malformed cache can never throw during transient-outage recovery.
+const parseCachedUser = (raw) => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+// Log only a sanitized, bounded subset of an error: its HTTP status and a
+// truncated message. The full Axios error object can carry the request config
+// (including the Authorization header) or the refresh-token request body, so
+// credential-bearing data must never reach the console from the auth flows.
+// All fields are safe defaults when missing.
+const toSafeErrorDetails = (error) => {
+  const status = error?.response?.status;
+  const message = typeof error?.message === 'string' ? error.message.slice(0, 200) : null;
+  return { status: status ?? null, message };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -41,7 +65,25 @@ export const AuthProvider = ({ children }) => {
         setRole(response.user.role);
       } catch (error) {
         if (!mounted) return;
-        console.error('Session validation failed:', error);
+
+        // A request timeout or a temporary network failure (slow/unreachable
+        // backend) is not an authentication failure. Keep the stored credentials
+        // and restore the cached session so a transient outage does not log the
+        // user out or redirect to login. The `finally` below still clears
+        // `loading` so the UI can recover.
+        if (isRequestTimeout(error) || isNetworkError(error)) {
+          setUser(parseCachedUser(localStorage.getItem('user')));
+          setRole(localStorage.getItem('role') || null);
+          toast.error(
+            translate(
+              isRequestTimeout(error) ? 'requestTimeout' : 'networkUnavailable',
+              'English'
+            )
+          );
+          return;
+        }
+
+        console.error('Session validation failed:', toSafeErrorDetails(error));
         setUser(null);
         setRole(null);
         localStorage.removeItem('accessToken');
@@ -72,7 +114,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.logout();
     } catch (error) {
-      console.error('Logout request failed:', error);
+      console.error('Logout request failed:', toSafeErrorDetails(error));
     } finally {
       setUser(null);
       setRole(null);

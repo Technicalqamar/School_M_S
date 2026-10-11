@@ -977,6 +977,8 @@ const en = {
   studentsLoadedSuccessfully: 'students loaded successfully.',
   failedToLoadStudents: 'Failed to load students.',
   networkError: 'Network error.',
+  requestTimeout: 'The server is taking too long to respond. Your session is preserved; please try again.',
+  networkUnavailable: 'The server is temporarily unreachable. Check your connection and try again — your session has been preserved.',
   studentsPromotedSuccessfully: 'Student(s) promoted successfully.',
   promotionFailed: 'Promotion failed.',
   confirmStudentsPromotion: 'Confirm Students Promotion',

@@ -34,7 +34,7 @@ const server = await connectDB()
     return srv;
   })
   .catch((err) => {
-    console.error('❌ Server ghoop ghoop:', err.message);
+    console.error('❌ Server Disconnected:', err.message);
     process.exit(1);
   });
 

@@ -5,7 +5,11 @@ import Button from '../../components/common/Button/Button';
 import portalService from '../../services/portal/portal.service';
 import StudentLayout from '../../layouts/StudentLayout';
 import { PortalProvider } from '../../contexts/PortalContext';
-import { setPortalAccessToken, clearPortalAccessToken } from '../../api/portalSession';
+import {
+  setPortalAccessToken,
+  clearPortalAccessToken,
+  subscribePortalSessionExpired,
+} from '../../api/portalSession';
 import { useTranslation } from '../../hooks/useLocalization';
 import { LockClosedIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
@@ -21,6 +25,13 @@ const PortalAccess = () => {
   const handledRef = useRef(false);
   const readyTimerRef = useRef(null);
   const expireTimerRef = useRef(null);
+  const statusRef = useRef(status);
+  // Track whether this component is still mounted and whether the validation
+  // step has already settled. The portal-context request is async; a late
+  // response must not repaint the screen after we have left `validating`
+  // (e.g. the handshake timed out) or after the tab/component unmounted.
+  const mountedRef = useRef(true);
+  const finishedRef = useRef(false);
 
   const receiveToken = useCallback(async (accessToken) => {
     if (handledRef.current) return;
@@ -31,16 +42,32 @@ const PortalAccess = () => {
 
     try {
       const res = await portalService.getPortalContext(accessToken);
+      if (!mountedRef.current || finishedRef.current) return;
       setPortalAccessToken(accessToken);
       setContext(res.data);
+      finishedRef.current = true;
       setStatus('ready');
     } catch {
+      // A rejected request (including the 20s portal-API timeout) means the
+      // secure session could not be validated. Show the existing "unavailable"
+      // state — this is not a confirmed token expiry, so it must stay distinct
+      // from the `expired` state.
+      if (!mountedRef.current || finishedRef.current) return;
+      finishedRef.current = true;
       setStatus('error');
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!window.opener) {
+      finishedRef.current = true;
       const timer = setTimeout(() => setStatus('expired'), 0);
       return () => clearTimeout(timer);
     }
@@ -62,7 +89,13 @@ const PortalAccess = () => {
     sendReady();
     readyTimerRef.current = setInterval(sendReady, 700);
     expireTimerRef.current = setTimeout(() => {
-      if (!handledRef.current) setStatus('expired');
+      if (!handledRef.current) {
+        // No token arrived in time. Settle on `expired`, and block any late
+        // handshake/token from repainting the screen afterwards.
+        handledRef.current = true;
+        finishedRef.current = true;
+        setStatus('expired');
+      }
     }, READY_TIMEOUT_MS);
 
     return () => {
@@ -72,6 +105,26 @@ const PortalAccess = () => {
     };
   }, [receiveToken]);
 
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  // When the short-lived portal token is rejected with 401, the API layer clears
+  // only the portal token and notifies us. Reuse the existing "expired" state so
+  // the tab shows the secure-session-unavailable screen (and unmounts the portal
+  // UI) instead of silently failing repeated API calls. The Admin Panel's login
+  // tokens in localStorage are never touched.
+  useEffect(
+    () =>
+      subscribePortalSessionExpired(() => {
+        if (statusRef.current !== 'ready') return;
+        setToken(null);
+        setContext(null);
+        setStatus('expired');
+      }),
+    []
+  );
+
   const closePortalTab = useCallback(() => {
     try {
       window.close();
@@ -80,16 +133,14 @@ const PortalAccess = () => {
     }
   }, []);
 
+  // Return to the Admin Panel by navigating THIS window. The previous
+  // implementation navigated window.opener, which only reloaded the Admin Panel
+  // tab in the background while the user stayed stranded on this expired Portal
+  // screen (window.opener.focus()/opener access across popups is not reliable).
+  // The Student Portal and Admin Panel share an origin and localStorage, so a
+  // normal navigation restores the administrator's existing session without
+  // clearing or invalidating it, and it drops the expired portal module state.
   const returnToAdminPanel = useCallback(() => {
-    try {
-      if (window.opener && !window.opener.closed) {
-        window.opener.focus();
-        window.opener.location.href = '/admin/students';
-        return;
-      }
-    } catch {
-      // Opener may be blocked for cross-origin access; fall back to local navigation.
-    }
     window.location.replace('/admin/students');
   }, []);
 
