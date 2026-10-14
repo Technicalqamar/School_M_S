@@ -51,6 +51,9 @@ const ReceptionistNotificationBell = () => {
     fetchData();
   }, [fetchData]);
 
+  // Keep in step with a realtime change and with the mark-as-read actions above.
+  useEffect(() => receptionistNotificationService.subscribe(fetchData), [fetchData]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {

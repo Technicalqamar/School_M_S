@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { RealtimeProvider } from './realtime/RealtimeProvider';
 import { SchoolConfigProvider, useSchoolConfig } from './contexts/SchoolConfigContext';
 import { LoaderProvider } from './contexts/LoaderContext';
 import SplashScreen from './components/common/SplashScreen/SplashScreen';
@@ -475,11 +476,13 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <SchoolConfigProvider>
-        <LoaderProvider>
-          <AppContent />
-        </LoaderProvider>
-      </SchoolConfigProvider>
+      <RealtimeProvider>
+        <SchoolConfigProvider>
+          <LoaderProvider>
+            <AppContent />
+          </LoaderProvider>
+        </SchoolConfigProvider>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

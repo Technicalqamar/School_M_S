@@ -13,6 +13,11 @@ import {
 } from './communicationTargeting.service.js';
 import { hasActionAccess } from '../constants/permissions.js';
 import {
+  emitNotificationCreated,
+  emitToUser,
+  REALTIME_EVENTS,
+} from '../realtime/emitters.js';
+import {
   NOTIFICATION_TYPE_VALUES,
   NOTIFICATION_SOURCE_VALUES,
   NOTIFICATION_SOURCES,
@@ -587,7 +592,24 @@ const createNotification = async (input = {}) => {
       });
     }
 
-    results.push(await persistNotification(doc));
+    const result = await persistNotification(doc);
+    results.push(result);
+
+    // Realtime fan-out: only genuinely new documents are broadcast, and only
+    // to the principal each document was written for (one doc per recipient).
+    // Idempotent re-processing (created === false) emits nothing. Any socket
+    // failure is swallowed so persistence and the caller are never affected.
+    if (result?.created) {
+      try {
+        let unreadCount;
+        if (target?.user) {
+          unreadCount = await countUnreadForPrincipal({ role: target.role, userId: target.user });
+        }
+        emitNotificationCreated({ target, doc: result.notification, unreadCount });
+      } catch (error) {
+        console.error('⚠️  Realtime notification emit failed:', error.message);
+      }
+    }
   }
 
   return {
@@ -679,16 +701,41 @@ const listForPrincipal = async (actor, filters = {}) => {
   };
 };
 
-const getUnreadCountForPrincipal = async (actor, options = {}) => {
-  const principal = await requirePrincipal(actor);
+// Builds the unread filter for a principal. Split out so the same definition
+// backs both the REST unread count and the realtime `notification:unread-count`
+// emissions, keeping the two permanently in agreement.
+const unreadCountFilter = (principal, categories) => {
   const filter = {
     ...inboxFilter(principal),
     readBy: { $ne: principal.userId },
   };
-  if (Array.isArray(options.categories) && options.categories.length) {
-    filter.category = { $in: options.categories };
+  if (Array.isArray(categories) && categories.length) {
+    filter.category = { $in: categories };
   }
-  const count = await Notification.countDocuments(filter);
+  return filter;
+};
+
+const countUnreadForPrincipal = (principal, categories) =>
+  Notification.countDocuments(unreadCountFilter(principal, categories));
+
+// Emits an update to the acting principal's own room(s) and follows it with a
+// freshly recomputed unread count. Only ever addressed to `principal`, so one
+// user's read/delete never leaks to another; a socket failure is swallowed.
+const emitPrincipalNotificationUpdate = async (principal, events = []) => {
+  try {
+    for (const [event, payload] of events) {
+      emitToUser(principal.role, principal.userId, event, payload);
+    }
+    const count = await countUnreadForPrincipal(principal);
+    emitToUser(principal.role, principal.userId, REALTIME_EVENTS.NOTIFICATION_UNREAD_COUNT, { count });
+  } catch (error) {
+    console.error('⚠️  Realtime notification sync emit failed:', error.message);
+  }
+};
+
+const getUnreadCountForPrincipal = async (actor, options = {}) => {
+  const principal = await requirePrincipal(actor);
+  const count = await countUnreadForPrincipal(principal, options.categories);
   return { count };
 };
 
@@ -704,7 +751,11 @@ const markAsReadForPrincipal = async (id, actor) => {
   );
   if (!notification) throw new ApiError(404, 'Notification not found');
 
-  return mapNotificationForPrincipal(notification.toObject(), principal);
+  const mapped = mapNotificationForPrincipal(notification.toObject(), principal);
+  await emitPrincipalNotificationUpdate(principal, [
+    [REALTIME_EVENTS.NOTIFICATION_READ, { id: String(notification._id) }],
+  ]);
+  return mapped;
 };
 
 const markAllReadForPrincipal = async (actor) => {
@@ -713,6 +764,9 @@ const markAllReadForPrincipal = async (actor) => {
     { ...inboxFilter(principal), readBy: { $ne: principal.userId } },
     { $addToSet: { readBy: principal.userId } },
   );
+  await emitPrincipalNotificationUpdate(principal, [
+    [REALTIME_EVENTS.NOTIFICATION_ALL_READ, { updatedCount: result.modifiedCount }],
+  ]);
   return { updatedCount: result.modifiedCount };
 };
 
@@ -740,6 +794,10 @@ const deleteForPrincipal = async (id, actor) => {
 
   const deleted = await Notification.findOneAndDelete({ _id: objectId, ...inboxFilter(principal) });
   if (!deleted) throw new ApiError(404, 'Notification not found');
+
+  await emitPrincipalNotificationUpdate(principal, [
+    [REALTIME_EVENTS.NOTIFICATION_DELETED, { id: String(deleted._id) }],
+  ]);
 
   return { id: String(deleted._id) };
 };
@@ -771,6 +829,13 @@ const deleteManyForPrincipal = async (ids, actor) => {
   if (!deletableIds.length) return { deletedCount: 0, notFoundIds };
 
   await Notification.deleteMany({ _id: { $in: deletableIds }, ...scope });
+
+  await emitPrincipalNotificationUpdate(principal, [
+    [REALTIME_EVENTS.NOTIFICATION_DELETED, {
+      ids: deletableIds.map((id) => String(id)),
+      deletedCount: deletableIds.length,
+    }],
+  ]);
 
   return { deletedCount: deletableIds.length, notFoundIds };
 };

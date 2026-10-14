@@ -8,6 +8,7 @@ import {
 } from './communicationTargeting.service.js';
 import studentSessionService from './studentSession.service.js';
 import teacherSessionService from './teacherSession.service.js';
+import { emitNoticeChanged } from '../realtime/emitters.js';
 
 const NOTICE_STATUSES = ['Draft', 'Published', 'Archived'];
 
@@ -47,6 +48,15 @@ const createNotice = async (data, userId) => {
       publishedAt: resolvedStatus === 'Published' ? new Date() : null,
       academicYear: year,
       createdBy: userId,
+    });
+    // Only after the notice is persisted. Signal-only: recipients refetch the
+    // reachable notices through the authorized portal REST surface.
+    emitNoticeChanged({
+      change: 'created',
+      id: notice._id,
+      audience: notice.audience,
+      status: notice.status,
+      academicYear: notice.academicYear,
     });
     return notice;
   } catch (error) {
@@ -141,7 +151,16 @@ const updateNotice = async (id, data, userId) => {
     const notice = await Notice.findByIdAndUpdate(id, update, { new: true, runValidators: true })
       .populate({ path: 'createdBy', select: 'fullName' })
       .lean();
-    return mapNotice(notice);
+    const mapped = mapNotice(notice);
+    // Only after the update persisted.
+    emitNoticeChanged({
+      change: 'updated',
+      id: mapped.id,
+      audience: mapped.audience,
+      status: mapped.status,
+      academicYear: mapped.academicYear,
+    });
+    return mapped;
   } catch (error) {
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((e) => e.message);
@@ -156,6 +175,14 @@ const deleteNotice = async (id) => {
   const notice = await Notice.findById(id);
   if (!notice) throw new ApiError(404, 'Notice not found');
   await Notice.findByIdAndDelete(id);
+  // Only after the delete persisted.
+  emitNoticeChanged({
+    change: 'deleted',
+    id: notice._id,
+    audience: notice.audience,
+    status: notice.status,
+    academicYear: notice.academicYear,
+  });
   return notice;
 };
 

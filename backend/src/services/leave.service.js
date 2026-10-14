@@ -4,6 +4,7 @@ import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
 import { ApiError } from '../utils/apiError.js';
 import notificationEngine from './notificationEngine.service.js';
+import { emitLeaveChanged } from '../realtime/emitters.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_RECIPIENT_ROLES,
@@ -216,6 +217,16 @@ const createLeave = async (data, userId) => {
       relatedEntity: { model: 'Leave', id: leave._id, label: mapped.personId },
     });
   }
+
+  // Signal the admin/receptionist leave lists to refresh (the requester already
+  // gets the targeted notification above). Only after the leave persisted.
+  emitLeaveChanged({
+    change: 'created',
+    id: leave._id,
+    type,
+    status: leave.status,
+    academicYear: leave.academicYear,
+  });
 
   return mapped;
 };
@@ -438,7 +449,16 @@ const updateLeave = async (id, data, userId) => {
       new: true,
       runValidators: true,
     });
-    return await populateAndMap(updated);
+    const mapped = await populateAndMap(updated);
+    // Only after the update persisted.
+    emitLeaveChanged({
+      change: 'updated',
+      id: mapped.id,
+      type: mapped.type,
+      status: mapped.status,
+      academicYear: mapped.academicYear,
+    });
+    return mapped;
   } catch (error) {
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((e) => e.message);
@@ -495,6 +515,16 @@ const decideLeave = async (id, status, userId) => {
     });
   }
 
+  // Signal the admin/receptionist lists that the leave's status changed. The
+  // requester is informed through the targeted notification above.
+  emitLeaveChanged({
+    change: 'updated',
+    id: mapped.id,
+    type: mapped.type,
+    status: mapped.status,
+    academicYear: mapped.academicYear,
+  });
+
   return mapped;
 };
 
@@ -508,6 +538,14 @@ const deleteLeave = async (id) => {
   }
 
   await Leave.findByIdAndDelete(id);
+  // Only after the delete persisted.
+  emitLeaveChanged({
+    change: 'deleted',
+    id: leave._id,
+    type: leave.type,
+    status: leave.status,
+    academicYear: leave.academicYear,
+  });
   return leave;
 };
 

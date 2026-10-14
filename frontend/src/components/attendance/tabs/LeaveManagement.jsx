@@ -17,6 +17,8 @@ import leaveService from '../../../services/leave/leave.service';
 import studentService from '../../../services/student/student.service';
 import teacherService from '../../../services/teacher/teacher.service';
 import { useTranslation } from '../../../hooks/useLocalization';
+import useRealtimeEvent from '../../../hooks/useRealtimeEvent';
+import { REALTIME_BUS_EVENTS } from '../../../realtime/events';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
@@ -260,6 +262,10 @@ const LeaveManagement = () => {
     fetchLeaves(1, {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A leave created/updated/decided in another portal refreshes this list (with
+  // the current page and filters) without a manual reload.
+  useRealtimeEvent(REALTIME_BUS_EVENTS.LEAVES_CHANGED, () => fetchLeaves(currentPage, buildFilters()));
 
   const handleSearch = () => fetchLeaves(1, buildFilters());
 

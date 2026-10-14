@@ -14,6 +14,8 @@ import CardSection from '../../components/common/CardSection/CardSection';
 import Spinner from '../../components/common/Spinner/Spinner';
 import studentAttendanceService from '../../services/student/studentAttendance.service';
 import { useTranslation } from '../../hooks/useLocalization';
+import useRealtimeEvent from '../../hooks/useRealtimeEvent';
+import { REALTIME_BUS_EVENTS } from '../../realtime/events';
 
 const EMPTY_DASH = '—';
 
@@ -152,6 +154,10 @@ const StudentAttendance = () => {
     loadLeaves();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A decision made by the administration updates this student's leave list
+  // without a manual reload.
+  useRealtimeEvent(REALTIME_BUS_EVENTS.LEAVES_CHANGED, loadLeaves);
 
   const handleRefresh = () => {
     loadAttendance();

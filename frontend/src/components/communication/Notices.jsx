@@ -99,6 +99,10 @@ const Notices = () => {
     fetchNotices();
   }, [fetchNotices]);
 
+  // Refresh on a realtime `notice:changed` (and on this page's own mutations,
+  // which the service reports through emitChange).
+  useEffect(() => noticeService.subscribe(fetchNotices), [fetchNotices]);
+
   const openCreate = () => {
     setEditing(null);
     setForm({ ...initialForm, academicYear: academic.currentYear || '' });
@@ -157,7 +161,8 @@ const Notices = () => {
       }
       setFormOpen(false);
       setEditing(null);
-      fetchNotices();
+      // noticeService emits a change, which the subscription above turns into
+      // a single refetch.
     } catch (err) {
       setFormError(err?.response?.data?.message || t('failedToSave'));
     } finally {
@@ -172,7 +177,8 @@ const Notices = () => {
       await noticeService.deleteNotice(deleteTarget.id);
       toast.success(t('noticeDeleted'));
       setDeleteTarget(null);
-      fetchNotices();
+      // noticeService emits a change, which the subscription above turns into
+      // a single refetch.
     } catch (err) {
       toast.error(err?.response?.data?.message || t('failedToDelete'));
     } finally {

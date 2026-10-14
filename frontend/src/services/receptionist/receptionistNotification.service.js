@@ -7,6 +7,24 @@ import api from '../../api/axios';
 //
 // The bell is compact by design: no create/edit/delete and no deep-links, so
 // this service intentionally has no manage/delete surface.
+// Tiny pub/sub so the always-visible Receptionist Bell badge can refresh the
+// moment the backend reports a change (realtime) or the bell performs its own
+// mark-as-read, without the bell having to poll.
+const changeListeners = new Set();
+const subscribe = (listener) => {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+};
+const emitChange = () => {
+  changeListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // A listener failure must not break the caller.
+    }
+  });
+};
+
 const normalizeNotification = (notification) => {
   if (!notification) return null;
   return {
@@ -38,13 +56,20 @@ const receptionistNotificationService = {
 
   markAsRead: async (id) => {
     const response = await api.put(`/receptionist/notifications/${id}/read`);
-    return normalizeNotification(response.data?.data?.notification) || null;
+    const notification = normalizeNotification(response.data?.data?.notification) || null;
+    emitChange();
+    return notification;
   },
 
   markAllRead: async () => {
     const response = await api.put('/receptionist/notifications/read-all');
-    return response.data?.data?.updatedCount ?? 0;
+    const updated = response.data?.data?.updatedCount ?? 0;
+    emitChange();
+    return updated;
   },
+
+  subscribe,
+  emitChange,
 };
 
 export default receptionistNotificationService;

@@ -99,6 +99,10 @@ const Notifications = () => {
     fetchUnreadCount();
   }, [fetchList, fetchUnreadCount]);
 
+  // Refresh the list and stat card on a realtime notification change (another
+  // session) as well as on this page's own mutations.
+  useEffect(() => notificationService.subscribe(refreshAll), [refreshAll]);
+
   const handleFieldChange = (field, value) => {
     setForm((prev) => {
       const next = { ...prev, [field]: value };
@@ -124,7 +128,8 @@ const Notifications = () => {
       toast.success(t('notificationCreated'));
       setFormOpen(false);
       setForm({ ...initialForm });
-      refreshAll();
+      // The subscription above refreshes the list + stat; emitChange is the
+      // single refresh trigger (also updates the Header Bell).
       notificationService.emitChange();
     } catch (err) {
       setFormError(err?.response?.data?.message || t('failedToSave'));
@@ -142,7 +147,7 @@ const Notifications = () => {
       );
       setViewNotification((prev) => (prev && prev.id === id ? { ...prev, read: true } : prev));
       setUnreadCount((prev) => Math.max(0, prev - 1));
-      fetchList();
+      // The subscription above refreshes the list + stat.
       notificationService.emitChange();
     } catch (err) {
       toast.error(err?.response?.data?.message || t('failedToUpdate'));
@@ -151,11 +156,11 @@ const Notifications = () => {
 
   const handleMarkAllRead = async () => {
     try {
-      const updated = await notificationService.markAllRead();
+      await notificationService.markAllRead();
       toast.success(t('allMarkedRead'));
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
-      if (updated > 0) fetchList();
+      // The subscription above refreshes the list + stat.
       notificationService.emitChange();
     } catch (err) {
       toast.error(err?.response?.data?.message || t('failedToUpdate'));
@@ -167,11 +172,11 @@ const Notifications = () => {
     setDeleting(true);
     try {
       // notificationService.deleteNotification emits the change event itself
-      // (that is what refreshes the Header Bell badge), so no extra emit here.
+      // (that is what refreshes the Header Bell badge and, via the subscription
+      // above, this list + stat), so no extra refresh here.
       await notificationService.deleteNotification(deleteTarget.id);
       toast.success(t('notificationDeleted'));
       setDeleteTarget(null);
-      refreshAll();
     } catch (err) {
       toast.error(err?.response?.data?.message || t('failedToDelete'));
     } finally {

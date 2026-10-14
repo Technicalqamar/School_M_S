@@ -19,6 +19,8 @@ import StatCard from '../../components/common/StatCard/StatCard';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
 import { getImageUrl } from '../../utils/imageUrl';
 import attendanceService from '../../services/teacher/attendance.service';
+import useRealtimeEvent from '../../hooks/useRealtimeEvent';
+import { REALTIME_BUS_EVENTS } from '../../realtime/events';
 
 const EMPTY_DASH = '—';
 
@@ -230,6 +232,10 @@ const TeacherAttendance = () => {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // A decision made by the administration updates this teacher's leave list
+  // without a manual reload.
+  useRealtimeEvent(REALTIME_BUS_EVENTS.LEAVES_CHANGED, loadLeaveRequests);
 
   // Close the per-student status dropdown when clicking elsewhere.
   useEffect(() => {

@@ -8,6 +8,24 @@ import api from '../../api/axios';
 const AUDIENCES = ['All', 'Students', 'Teachers'];
 const STATUSES = ['Draft', 'Published', 'Archived'];
 
+// Tiny pub/sub so the admin Notice list (and any other subscriber) refreshes as
+// soon as a notice is created/updated/deleted - either by this tab or by a
+// realtime `notice:changed` signal from another session.
+const changeListeners = new Set();
+const subscribe = (listener) => {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+};
+const emitChange = () => {
+  changeListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // A listener failure must not break the caller.
+    }
+  });
+};
+
 const normalizeNotice = (notice) => {
   if (!notice) return null;
   return {
@@ -41,18 +59,26 @@ const noticeService = {
 
   createNotice: async (data) => {
     const response = await api.post('/communication/notices', data);
-    return normalizeNotice(response.data?.data?.notice) || null;
+    const notice = normalizeNotice(response.data?.data?.notice) || null;
+    emitChange();
+    return notice;
   },
 
   updateNotice: async (id, data) => {
     const response = await api.put(`/communication/notices/${id}`, data);
-    return normalizeNotice(response.data?.data?.notice) || null;
+    const notice = normalizeNotice(response.data?.data?.notice) || null;
+    emitChange();
+    return notice;
   },
 
   deleteNotice: async (id) => {
     const response = await api.delete(`/communication/notices/${id}`);
+    emitChange();
     return response.data;
   },
+
+  subscribe,
+  emitChange,
 
   AUDIENCES,
   STATUSES,
