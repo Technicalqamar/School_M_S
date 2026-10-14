@@ -1,17 +1,8 @@
 import mongoose from 'mongoose';
 import Receptionist from '../models/receptionist.model.js';
 import UserAccount from '../models/userAccount.model.js';
-import Student from '../models/student.model.js';
-import Teacher from '../models/teacher.model.js';
-import Class from '../models/class.model.js';
-import SchoolSettings from '../models/schoolSettings.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import { ApiError } from '../utils/apiError.js';
-import defaultPasswordService from './defaultPassword.service.js';
-import studentService from './student.service.js';
-import noticeService from './notice.service.js';
-import studentAttendanceService from './studentAttendance.service.js';
-import feeOutstandingService from './feeOutstanding.service.js';
 import {
   DEFAULT_RECEPTIONIST_PERMISSIONS,
   sanitizePermissions,
@@ -19,13 +10,11 @@ import {
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const MIN_PASSWORD_LENGTH = 6;
+const MAX_PASSWORD_LENGTH = 128;
 
 // Public shape of a receptionist returned to the Admin UI. Never includes the
-// password hash, encrypted default-password material or any secret.
+// password hash or any secret.
 const formatReceptionist = (receptionist, account = null) => ({
   id: receptionist._id,
   receptionistId: receptionist.receptionistId,
@@ -61,23 +50,40 @@ const findAccount = (receptionistId) =>
   UserAccount.findOne({ referenceId: receptionistId, referenceModel: 'Receptionist' });
 
 /**
- * Create a Receptionist profile and its linked login account. The initial
- * password comes from the Admin-configured Receptionist Default Password (the
- * same configurable system used for students/teachers) and is hashed by the
- * UserAccount model. The plaintext is returned once so the Admin can hand it
- * over; it is never logged or persisted in plaintext.
+ * Create a Receptionist profile and its linked login account.
+ *
+ * The Admin supplies both the Receptionist ID (loginId) and the initial
+ * password explicitly - there is no default-password flow and no auto
+ * generation. The loginId must be unique (validated here against existing
+ * profiles; the UserAccount `loginId` unique index is a second line of
+ * defence). The password is hashed by the UserAccount model and the plaintext
+ * is never logged, persisted or returned after creation. Receptionist accounts
+ * do not use the `mustChangePassword` first-login flow: they log in directly
+ * with the Admin-assigned password.
  */
 const createReceptionist = async (data, performedBy = null) => {
   const fullName = (data.fullName || '').trim();
-  if (fullName.length < 3 || fullName.length > 100) {
+  if (!fullName || fullName.length < 3 || fullName.length > 100) {
     throw new ApiError(400, 'Full name must be between 3 and 100 characters');
   }
 
-  const password = await defaultPasswordService.getDefaultPasswordForRole('receptionist');
-  if (!password) {
+  const receptionistId = (data.receptionistId || '').trim();
+  if (!receptionistId) {
+    throw new ApiError(400, 'Receptionist ID (login ID) is required');
+  }
+  if (receptionistId.length > 50) {
+    throw new ApiError(400, 'Receptionist ID must be at most 50 characters');
+  }
+  const existing = await Receptionist.findOne({ receptionistId });
+  if (existing) {
+    throw new ApiError(409, 'This Receptionist ID is already in use. Choose a unique login ID.');
+  }
+
+  const password = typeof data.password === 'string' ? data.password : '';
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
     throw new ApiError(
       400,
-      'Receptionist default password is not configured. Set it in User Accounts before creating receptionist accounts.',
+      `Password must be between ${MIN_PASSWORD_LENGTH} and ${MAX_PASSWORD_LENGTH} characters`,
     );
   }
 
@@ -88,6 +94,7 @@ const createReceptionist = async (data, performedBy = null) => {
   let receptionist = null;
   try {
     receptionist = await Receptionist.create({
+      receptionistId,
       fullName,
       email: (data.email || '').trim(),
       phone: (data.phone || '').trim(),
@@ -97,7 +104,7 @@ const createReceptionist = async (data, performedBy = null) => {
     });
 
     const account = await UserAccount.create({
-      loginId: receptionist.receptionistId,
+      loginId: receptionistId,
       role: 'receptionist',
       referenceId: receptionist._id,
       referenceModel: 'Receptionist',
@@ -106,17 +113,13 @@ const createReceptionist = async (data, performedBy = null) => {
       phone: receptionist.phone || undefined,
       fullName: receptionist.fullName,
       isActive: receptionist.status === 'Active',
-      mustChangePassword: true,
+      mustChangePassword: false,
     });
 
     await logAudit('CREATE', receptionist, performedBy, { permissions });
 
     return {
       receptionist: formatReceptionist(receptionist, account),
-      temporaryCredentials: {
-        loginId: receptionist.receptionistId,
-        password,
-      },
     };
   } catch (error) {
     // Compensate so a failed account creation never leaves an orphaned profile.
@@ -178,6 +181,12 @@ const updateReceptionist = async (id, data, performedBy = null) => {
   const receptionist = await Receptionist.findById(id);
   if (!receptionist) {
     throw new ApiError(404, 'Receptionist not found');
+  }
+
+  // receptionistId is the login ID: it is immutable after creation so the
+  // linked account's loginId stays in sync and audit history stays coherent.
+  if (data.receptionistId !== undefined && String(data.receptionistId).trim() !== receptionist.receptionistId) {
+    throw new ApiError(400, 'Receptionist ID cannot be changed after creation');
   }
 
   if (data.fullName !== undefined) {
@@ -252,31 +261,48 @@ const updateReceptionistPermissions = async (id, permissions, performedBy = null
   return formatReceptionist(receptionist, await findAccount(receptionist._id));
 };
 
-const resetReceptionistPassword = async (id, newPassword, performedBy = null) => {
+// Admin-only password reset for a forgotten receptionist password. Used by the
+// Receptionist Management module; the route is mounted behind
+// `protect + authorize('admin')`, and the service performs its own role check
+// so the operation can never be invoked by a Receptionist (including their own
+// account). The new password is hashed by the UserAccount model on save; the
+// plaintext and the hash are never returned or logged. Following the
+// receptionist creation convention (they log in directly with the
+// Admin-assigned password, with no must-change-password first-login flow), the
+// reset clears `mustChangePassword` so the next login works with the new
+// password immediately.
+const resetReceptionistPassword = async (id, newPassword, performedBy = null, performerRole = null) => {
+  if (performerRole !== 'admin') {
+    throw new ApiError(403, 'Only an Admin can reset a receptionist password');
+  }
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new ApiError(400, 'Invalid receptionist ID');
-  }
-  if (!newPassword || newPassword.length < 6) {
-    throw new ApiError(400, 'Password must be at least 6 characters');
   }
   const receptionist = await Receptionist.findById(id);
   if (!receptionist) {
     throw new ApiError(404, 'Receptionist not found');
   }
-  const account = await findAccount(receptionist._id);
-  if (!account) {
-    throw new ApiError(404, 'Linked account not found');
+
+  const password = typeof newPassword === 'string' ? newPassword : '';
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    throw new ApiError(
+      400,
+      `Password must be between ${MIN_PASSWORD_LENGTH} and ${MAX_PASSWORD_LENGTH} characters`,
+    );
   }
 
-  account.password = newPassword;
-  // An Admin reset always forces the receptionist to set a new password on the
-  // next login.
-  account.mustChangePassword = true;
+  const account = await findAccount(receptionist._id);
+  if (!account) {
+    throw new ApiError(404, 'Receptionist login account not found');
+  }
+
+  account.password = password;
+  account.mustChangePassword = false;
   await account.save();
 
-  await logAudit('UPDATE', receptionist, performedBy, { passwordReset: true });
+  await logAudit('UPDATE', receptionist, performedBy, { resetPassword: true });
 
-  return true;
+  return formatReceptionist(receptionist, account);
 };
 
 const deleteReceptionist = async (id, performedBy = null) => {
@@ -298,162 +324,6 @@ const deleteReceptionist = async (id, performedBy = null) => {
   return { receptionistId: receptionist.receptionistId };
 };
 
-/**
- * Genuine aggregate counts for the Receptionist dashboard. No fabricated
- * statistics: every figure is read from the database.
- */
-const getPortalDashboard = async () => {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-  const [students, activeStudents, teachers, classes, newAdmissions, recentStudents] = await Promise.all([
-    Student.countDocuments(),
-    Student.countDocuments({ status: 'Active' }),
-    Teacher.countDocuments(),
-    Class.countDocuments(),
-    Student.countDocuments({ admissionDate: { $gte: monthStart, $lt: monthEnd } }),
-    Student.find().sort({ createdAt: -1 }).limit(5).select('studentId fullName class status').lean(),
-  ]);
-
-  return {
-    statistics: {
-      totalStudents: students,
-      activeStudents,
-      totalTeachers: teachers,
-      totalClasses: classes,
-      newAdmissions,
-      month: MONTHS[now.getMonth()],
-    },
-    recentStudents: recentStudents.map((student) => ({
-      studentId: student.studentId,
-      fullName: student.fullName,
-      class: student.class,
-      status: student.status,
-    })),
-  };
-};
-
-const getPortalStudents = (query) => studentService.getAllStudents(query);
-
-const getPortalStudent = async (studentId) => {
-  const student = await studentService.getStudentById(studentId);
-  if (!student) {
-    throw new ApiError(404, 'Student not found');
-  }
-  return student;
-};
-
-// -- Notices / Attendance / Fees (read-only portal modules) -------------------
-//
-// Each of these is reached only through a route gated by `requirePermission`,
-// so the backend independently checks the receptionist's permission before the
-// handler runs. The data itself comes from the existing school services; the
-// receptionist portal never bypasses their internal rules.
-
-const getCurrentAcademicYear = async () => {
-  const settings = await SchoolSettings.getSettings();
-  if (settings?.currentAcademicYear && /^\d{4}$/.test(settings.currentAcademicYear)) {
-    return settings.currentAcademicYear;
-  }
-  return String(new Date().getFullYear());
-};
-
-// Receptionists see notices a front desk handles in person: school-wide
-// announcements and legacy Staff-targeted ones. They are read-only - the
-// Receptionist portal never marks notices read or publishes new ones.
-const RECEPTIONIST_NOTICE_AUDIENCES = ['All', 'Staff'];
-
-const getPortalNotices = async (query = {}) => {
-  const academicYear = await getCurrentAcademicYear();
-  return noticeService.listNoticesForPortal({
-    audiences: RECEPTIONIST_NOTICE_AUDIENCES,
-    academicYear,
-    search: query.search,
-    page: query.page,
-    limit: query.limit,
-  });
-};
-
-const getPortalNotice = async (id) => {
-  const academicYear = await getCurrentAcademicYear();
-  return noticeService.getNoticeForPortal(id, {
-    audiences: RECEPTIONIST_NOTICE_AUDIENCES,
-    academicYear,
-  });
-};
-
-const assertStudentIdPresent = (studentId) => {
-  if (!studentId || typeof studentId !== 'string' || !String(studentId).trim()) {
-    throw new ApiError(400, 'Student ID is required');
-  }
-};
-
-const getPortalAttendance = async ({ studentId, academicYear } = {}) => {
-  assertStudentIdPresent(studentId);
-
-  const student = await Student.findOne({ studentId: String(studentId).trim() })
-    .select('studentId fullName class status fatherName')
-    .lean();
-  if (!student) {
-    throw new ApiError(404, 'Student not found');
-  }
-
-  const effectiveYear = academicYear || (await getCurrentAcademicYear());
-  const records = await studentAttendanceService.getAttendanceByStudent(
-    student._id,
-    effectiveYear,
-  );
-
-  return {
-    student: {
-      studentId: student.studentId,
-      fullName: student.fullName,
-      class: student.class,
-      status: student.status,
-      fatherName: student.fatherName || null,
-    },
-    attendance: records.map((record) => ({
-      _id: record._id,
-      date: record.date,
-      status: record.status,
-      method: record.method || 'Manual',
-      checkIn: record.checkIn || null,
-      checkOut: record.checkOut || null,
-      remarks: record.remarks || '',
-    })),
-    academicYear: effectiveYear,
-  };
-};
-
-const getPortalFees = async ({ studentId, academicYear } = {}) => {
-  assertStudentIdPresent(studentId);
-
-  const student = await Student.findOne({ studentId: String(studentId).trim() })
-    .select('studentId fullName class status fatherName')
-    .lean();
-  if (!student) {
-    throw new ApiError(404, 'Student not found');
-  }
-
-  const effectiveYear = academicYear || (await getCurrentAcademicYear());
-  const fees = await feeOutstandingService.getStudentOutstandingDues(
-    student._id,
-    effectiveYear,
-  );
-
-  return {
-    student: {
-      studentId: student.studentId,
-      fullName: student.fullName,
-      class: student.class,
-      status: student.status,
-      fatherName: student.fatherName || null,
-    },
-    fees,
-  };
-};
-
 export default {
   createReceptionist,
   getReceptionists,
@@ -463,11 +333,4 @@ export default {
   updateReceptionistPermissions,
   resetReceptionistPassword,
   deleteReceptionist,
-  getPortalDashboard,
-  getPortalStudents,
-  getPortalStudent,
-  getPortalNotices,
-  getPortalNotice,
-  getPortalAttendance,
-  getPortalFees,
 };

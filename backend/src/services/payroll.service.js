@@ -10,6 +10,8 @@ import notificationEngine from './notificationEngine.service.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_RECIPIENT_ROLES,
+  NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -636,6 +638,16 @@ const notifyTeacherSalaryPaid = async (payment, payroll) => {
       role: NOTIFICATION_RECIPIENT_ROLES.TEACHER,
       teacherId: payment.teacherId,
     },
+    relatedEntity: { model: 'Payroll', id: payment._id, label: payment.paymentReference || period },
+  });
+
+  // One "General" copy for receptionists granted the "other" bell category.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.SALARY_PAYMENT_RECORDED,
+    title: 'Salary payment recorded',
+    message: `${amount} paid for ${period} via ${payment.paymentMethod}.${payment.paymentReference ? ` Reference: ${payment.paymentReference}.` : ''} Net salary for the period: ${net}.`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+    category: NOTIFICATION_CATEGORIES.GENERAL,
     relatedEntity: { model: 'Payroll', id: payment._id, label: payment.paymentReference || period },
   });
 };

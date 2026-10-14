@@ -9,6 +9,7 @@ import notificationEngine from './notificationEngine.service.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 const validateId = (id, label = 'Mark') => {
@@ -278,6 +279,18 @@ const bulkSaveMarks = async (data) => {
     title: 'Marks submitted',
     message: `${entries.length} mark ${entries.length === 1 ? 'entry was' : 'entries were'} saved for ${exam.name} — ${className}, ${academicYear}. ${result.upsertedCount} added, ${result.modifiedCount} updated.`,
     fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+    academicYear,
+    relatedEntity: { model: 'Exam', id: examId, label: exam.name },
+    eventKey: `${subjectId}:${className}`,
+  });
+
+  // Same event fan-out to receptionists granted the "other" bell category.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.MARKS_SUBMITTED,
+    title: 'Marks submitted',
+    message: `${entries.length} mark ${entries.length === 1 ? 'entry was' : 'entries were'} saved for ${exam.name} — ${className}, ${academicYear}. ${result.upsertedCount} added, ${result.modifiedCount} updated.`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+    category: NOTIFICATION_CATEGORIES.GENERAL,
     academicYear,
     relatedEntity: { model: 'Exam', id: examId, label: exam.name },
     eventKey: `${subjectId}:${className}`,

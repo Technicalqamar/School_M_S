@@ -3,13 +3,18 @@ import DateTime from '../DateTime/DateTime';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
 import NotificationBell from '../NotificationBell/NotificationBell';
 import AdminDropdown from '../AdminDropdown/AdminDropdown';
+import ReceptionistNotificationBell from '../ReceptionistNotificationBell/ReceptionistNotificationBell';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const Header = ({ sidebarOpen, toggleSidebar }) => {
   const { schoolBranding } = useSchoolBranding();
   const logoUrl = schoolBranding?.adminPanelLogo ? getImageUrl(schoolBranding.adminPanelLogo) : null;
   const schoolName = schoolBranding?.schoolName || '';
+  const { role, user } = useAuth();
+  const isReceptionist = role === 'receptionist';
 
   return (
     <header
@@ -48,7 +53,15 @@ const Header = ({ sidebarOpen, toggleSidebar }) => {
             <DateTime />
           </div>
           <ThemeToggle />
-          <NotificationBell />
+          {/* The notification bell reads Admin-scoped notification APIs. It is
+              hidden for receptionists (even those with Communication access) so
+              no admin-scoped request is fired from the shared shell; instead a
+              receptionist with the `notification-bell` capability gets the
+              compact permissioned bell below (hidden without bell-view). */}
+          {!isReceptionist && <NotificationBell />}
+          {isReceptionist && hasReceptionistActionAccess(user, 'notification-bell', 'bell-view') && (
+            <ReceptionistNotificationBell />
+          )}
           <AdminDropdown />
         </div>
       </div>

@@ -13,11 +13,15 @@ import SubjectCard from '../../common/SubjectCard/SubjectCard';
 import SubjectViewModal from '../../common/SubjectViewModal/SubjectViewModal';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
 import subjectService from '../../../services/subject/subject.service';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const ITEMS_PER_PAGE = 10;
 
 const AllSubjects = ({ onViewDetails, onEditSubject, selectedSubject, onCloseView }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const canSubject = (actionKey) => hasReceptionistActionAccess(user, 'subject-management', actionKey);
   const statusOptions = [t('all'), t('active'), t('inactive')];
   const [view, setView] = useState('table');
   const [search, setSearch] = useState('');
@@ -106,9 +110,9 @@ const AllSubjects = ({ onViewDetails, onEditSubject, selectedSubject, onCloseVie
       </td>
       <td className="px-4 py-3 text-right">
         <ActionButtons
-          onView={() => onViewDetails(subject)}
-          onEdit={() => onEditSubject(subject)}
-          onDelete={() => setDeletingSubject(subject)}
+          onView={canSubject('subject-view') ? () => onViewDetails(subject) : undefined}
+          onEdit={canSubject('subject-edit') ? () => onEditSubject(subject) : undefined}
+          onDelete={canSubject('subject-delete') ? () => setDeletingSubject(subject) : undefined}
         />
       </td>
     </>
@@ -234,9 +238,9 @@ const AllSubjects = ({ onViewDetails, onEditSubject, selectedSubject, onCloseVie
                   <SubjectCard
                     key={subject._id}
                     subject={subject}
-                    onView={() => onViewDetails(subject)}
-                    onEdit={() => onEditSubject(subject)}
-                    onDelete={() => setDeletingSubject(subject)}
+                    onView={canSubject('subject-view') ? () => onViewDetails(subject) : undefined}
+                    onEdit={canSubject('subject-edit') ? () => onEditSubject(subject) : undefined}
+                    onDelete={canSubject('subject-delete') ? () => setDeletingSubject(subject) : undefined}
                   />
                 ))}
               </div>

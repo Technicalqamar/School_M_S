@@ -27,7 +27,7 @@ import {
   validatePaymentList,
 } from '../validations/payroll.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
@@ -36,36 +36,36 @@ const router = express.Router();
 // ─── Payroll record APIs (recordType: 'payroll') ────────────────────
 // Registered before the /:id routes so these literal paths are never treated
 // as salary-structure ids.
-router.post('/generate', protect, authorize('admin'), validateGeneratePayroll, generatePayroll);
+router.post('/generate', protect, requireModuleAccess('payroll-management', 'payroll'), validateGeneratePayroll, generatePayroll);
 
-router.get('/records', protect, authorize('admin'), validatePayrollList, getPayrolls);
+router.get('/records', protect, requireModuleAccess('payroll-management', 'payroll'), validatePayrollList, getPayrolls);
 
-router.get('/records/:id', protect, authorize('admin'), validatePayrollId, getPayrollById);
+router.get('/records/:id', protect, requireModuleAccess('payroll-management', 'payroll'), validatePayrollId, getPayrollById);
 
-router.delete('/records/:id', protect, authorize('admin'), validatePayrollId, deletePayroll);
+router.delete('/records/:id', protect, requireModuleAccess('payroll-management', 'payroll'), validatePayrollId, deletePayroll);
 
 // ─── Payment APIs (recordType: 'payment') ───────────────────────────
 // Registered before the /:id routes so the literal paths are never treated
 // as salary-structure ids.
-router.post('/payments', protect, authorize('admin'), validateCreatePayment, createPayment);
+router.post('/payments', protect, requireModuleAccess('payroll-management', 'salary-history'), validateCreatePayment, createPayment);
 
-router.get('/payments', protect, authorize('admin'), validatePaymentList, getPayments);
+router.get('/payments', protect, requireModuleAccess('payroll-management', 'salary-history'), validatePaymentList, getPayments);
 
-router.get('/payments/:id', protect, authorize('admin'), validatePaymentId, getPaymentById);
+router.get('/payments/:id', protect, requireModuleAccess('payroll-management', 'salary-history'), validatePaymentId, getPaymentById);
 
-router.put('/payments/:id', protect, authorize('admin'), validatePaymentId, validateUpdatePayment, updatePayment);
+router.put('/payments/:id', protect, requireModuleAccess('payroll-management', 'salary-history'), validatePaymentId, validateUpdatePayment, updatePayment);
 
-router.delete('/payments/:id', protect, authorize('admin'), validatePaymentId, deletePayment);
+router.delete('/payments/:id', protect, requireModuleAccess('payroll-management', 'salary-history'), validatePaymentId, deletePayment);
 
 // ─── Salary Structure APIs (recordType: 'salary-structure') ─────────
-router.get('/', protect, authorize('admin'), getSalaryStructures);
+router.get('/', protect, requireModuleAccess('payroll-management', 'salary-structure'), getSalaryStructures);
 
-router.post('/', protect, authorize('admin'), validateCreatePayroll, createSalaryStructure);
+router.post('/', protect, requireModuleAccess('payroll-management', 'salary-structure'), validateCreatePayroll, createSalaryStructure);
 
-router.get('/:id', protect, authorize('admin'), validatePayrollId, getSalaryStructureById);
+router.get('/:id', protect, requireModuleAccess('payroll-management', 'salary-structure'), validatePayrollId, getSalaryStructureById);
 
-router.put('/:id', protect, authorize('admin'), validatePayrollId, validateUpdatePayroll, updateSalaryStructure);
+router.put('/:id', protect, requireModuleAccess('payroll-management', 'salary-structure'), validatePayrollId, validateUpdatePayroll, updateSalaryStructure);
 
-router.delete('/:id', protect, authorize('admin'), validatePayrollId, deleteSalaryStructure);
+router.delete('/:id', protect, requireModuleAccess('payroll-management', 'salary-structure'), validatePayrollId, deleteSalaryStructure);
 
 export default router;

@@ -16,6 +16,8 @@ import { getImageUrl } from '../../../utils/imageUrl';
 import Spinner from '../../common/Spinner/Spinner';
 import Button from '../../common/Button/Button';
 import { useFormatTime } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 import studentAttendanceService from '../../../services/studentAttendance/studentAttendance.service';
 import qrAttendanceService from '../../../services/qrAttendanceService/qrAttendanceService';
@@ -45,7 +47,12 @@ const PAGE_SIZE = 10;
 
 const StudentAttendance = () => {
   const formatTime = useFormatTime();
+  const { user } = useAuth();
   const { academic, attendanceRules, weekendSettings } = useSchoolConfig();
+  // Marking attendance (manual status/list, Mark All Present, QR scanning and
+  // check-in reset) is a `student-attendance-mark` operation. Viewing and
+  // loading lists only need `student-attendance-view`.
+  const canMark = hasReceptionistActionAccess(user, 'attendance-management', 'student-attendance-mark');
   const STATUS_OPTIONS = attendanceRules?.allowLeaveMarking
     ? [...BASE_STATUS_OPTIONS, 'Leave']
     : BASE_STATUS_OPTIONS;
@@ -708,7 +715,16 @@ const StudentAttendance = () => {
     </div>
   );
 
-  const renderStatusDropdown = (studentId, currentStatus) => (
+  const renderStatusDropdown = (studentId, currentStatus) => {
+    if (!canMark) {
+      return (
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${STATUS_COLORS[currentStatus].text}`}>
+          <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[currentStatus].dot}`} />
+          {currentStatus}
+        </span>
+      );
+    }
+    return (
     <div className="relative">
       <button
         type="button"
@@ -735,7 +751,8 @@ const StudentAttendance = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const renderPagination = () => {
     if (students.length === 0) return null;
@@ -858,13 +875,15 @@ const StudentAttendance = () => {
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleResetClick(student)}
-                        title="Reset Attendance"
-                        className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <ArrowPathIcon className="h-4 w-4" />
-                      </button>
+                      {canMark && (
+                        <button
+                          onClick={() => handleResetClick(student)}
+                          title="Reset Attendance"
+                          className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                        >
+                          <ArrowPathIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1000,7 +1019,7 @@ const StudentAttendance = () => {
             <UserGroupIcon className="h-4 w-4" />
             Load Students
           </Button>
-          {loaded && !isWeekend && (
+          {loaded && !isWeekend && canMark && (
             <button
               onClick={handleMarkAllPresent}
               disabled={loading}
@@ -1013,7 +1032,7 @@ const StudentAttendance = () => {
         </div>
       </div>
 
-      {isScannerMode && renderScannerPanel()}
+      {isScannerMode && canMark && renderScannerPanel()}
 
       {loading && renderLoadingState()}
       {!loading && !loaded && renderEmptyState()}

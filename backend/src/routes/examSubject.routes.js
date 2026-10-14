@@ -8,11 +8,11 @@ import {
 } from '../controllers/examSubject.controller.js';
 import { validateCreateExamSubject, validateUpdateExamSubject } from '../validations/examSubject.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
-router.use(protect, authorize('admin'));
+router.use(protect, requireModuleAccess('exam-management', 'subjects-marks'));
 
 router.get('/', getAllExamSubjects);
 

@@ -16,7 +16,7 @@ import {
   validateSystemPreferences,
 } from '../validations/schoolSettings.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 import { createUploader } from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
@@ -27,14 +27,14 @@ router.get('/public', getPublicSchoolSettings);
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   getSchoolSettings,
 );
 
 router.put(
   '/information',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   validateSchoolInformation,
   updateSchoolInformation,
 );
@@ -42,7 +42,7 @@ router.put(
 router.put(
   '/academic',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   validateAcademicSettings,
   updateAcademicSettings,
 );
@@ -50,7 +50,7 @@ router.put(
 router.put(
   '/branding',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   validateBrandingSettings,
   updateBrandingSettings,
 );
@@ -58,7 +58,7 @@ router.put(
 router.put(
   '/preferences',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   validateSystemPreferences,
   updateSystemPreferences,
 );
@@ -66,7 +66,7 @@ router.put(
 router.put(
   '/image/:field',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   schoolSettingsUpload.single('image'),
   updateSchoolImage,
 );
@@ -74,7 +74,7 @@ router.put(
 router.delete(
   '/image/:field',
   protect,
-  authorize('admin'),
+  requireModuleAccess('school-settings'),
   removeSchoolImage,
 );
 

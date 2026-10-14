@@ -3,49 +3,49 @@ import { createClass, getAllClasses, getClassDetails, updateClass, deleteClass }
 import { getClassTeacherAssignments, assignTeacherSubject, removeTeacherSubject } from '../controllers/classTeacher.controller.js';
 import { validateCreateClass, validateUpdateClass } from '../validations/class.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-view'),
   getAllClasses,
 );
 
 router.get(
   '/:id/teacher-assignments',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-view'),
   getClassTeacherAssignments,
 );
 
 router.post(
   '/:id/teacher-assignments',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-edit'),
   assignTeacherSubject,
 );
 
 router.delete(
   '/:id/teacher-assignments/:teacherId/:subjectId',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-edit'),
   removeTeacherSubject,
 );
 
 router.get(
   '/:id/details',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-view'),
   getClassDetails,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-create'),
   validateCreateClass,
   createClass,
 );
@@ -53,7 +53,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-edit'),
   validateUpdateClass,
   updateClass,
 );
@@ -61,7 +61,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('class-management', 'class-delete'),
   deleteClass,
 );
 

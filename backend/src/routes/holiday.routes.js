@@ -9,14 +9,14 @@ import {
 } from '../controllers/holiday.controller.js';
 import { validateCreateHoliday, validateUpdateHoliday } from '../validations/holiday.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/calendar',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   (req, _res, next) => {
     req.query.limit = '500';
     next();
@@ -27,7 +27,7 @@ router.get(
 router.get(
   '/type/:type',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   (req, _res, next) => {
     req.query.type = req.params.type;
     req.query.limit = '500';
@@ -39,7 +39,7 @@ router.get(
 router.get(
   '/academic-year/:year',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   (req, _res, next) => {
     req.query.academicYear = req.params.year;
     req.query.limit = '500';
@@ -51,28 +51,28 @@ router.get(
 router.get(
   '/academic-years',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   getHolidayAcademicYears,
 );
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   getAllHolidays,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-view'),
   getHolidayById,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-create'),
   validateCreateHoliday,
   createHoliday,
 );
@@ -80,7 +80,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-edit'),
   validateUpdateHoliday,
   updateHoliday,
 );
@@ -88,7 +88,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'holiday-delete'),
   deleteHoliday,
 );
 

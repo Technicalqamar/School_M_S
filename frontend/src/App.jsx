@@ -7,7 +7,10 @@ import { LoaderProvider } from './contexts/LoaderContext';
 import SplashScreen from './components/common/SplashScreen/SplashScreen';
 import FullPageLoader from './components/common/FullPageLoader/FullPageLoader';
 import ProtectedRoute from './components/ProtectedRoute';
+import RequireModule from './components/RequireModule';
+import RequireAdmin from './components/RequireAdmin';
 import { ADMIN_MODULES } from './constants/adminModules';
+import { findFirstAccessibleModulePath } from './constants/receptionistPermissions';
 
 import AdminLoginPage from './pages/auth/AdminAuth/AdminLogin';
 import AdminForgotPasswordPage from './pages/auth/AdminAuth/ForgotPassword';
@@ -71,16 +74,9 @@ import ResultHistoryPage from './pages/admin/ExamManagement/ResultHistory';
 import AllAccountsPage from './pages/admin/UserAccounts/AllAccounts';
 import CreateAccountPage from './pages/admin/UserAccounts/CreateAccount';
 import AccountAccessPage from './pages/admin/UserAccounts/AccountAccess';
-import ReceptionistAccountsPage from './pages/admin/UserAccounts/ReceptionistAccounts';
 import ReceptionistLoginPage from './pages/auth/ReceptionistAuth/ReceptionistLogin';
-import ReceptionistLayout from './layouts/ReceptionistLayout';
-import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
-import StudentRecords from './pages/receptionist/StudentRecords';
-import ReceptionistAttendance from './pages/receptionist/ReceptionistAttendance';
-import ReceptionistFees from './pages/receptionist/ReceptionistFees';
-import ReceptionistNotices from './pages/receptionist/ReceptionistNotices';
-import ModuleUnavailable from './pages/receptionist/ModuleUnavailable';
-import RequirePermission from './components/receptionist/RequirePermission';
+import ReceptionistManagementPage from './pages/admin/ReceptionistManagement';
+import AccessDeniedPage from './pages/admin/AccessDenied';
 
 function IndexRedirect() {
   const { user, role, loading: authLoading, DASHBOARD_ROUTES, CHANGE_PASSWORD_ROUTES } = useAuth();
@@ -94,6 +90,12 @@ function IndexRedirect() {
     // dashboard (whose shells would fire blocked requests).
     if (user.mustChangePassword === true && CHANGE_PASSWORD_ROUTES[role]) {
       return <Navigate to={CHANGE_PASSWORD_ROUTES[role]} replace />;
+    }
+    // Receptionists share the Admin pages. They land on their first granted
+    // module (or an honest "access denied" screen when nothing is granted).
+    if (role === 'receptionist') {
+      const landing = findFirstAccessibleModulePath(user);
+      return <Navigate to={landing || '/admin/access-denied'} replace />;
     }
     return <Navigate to={DASHBOARD_ROUTES[role] || '/admin/login'} replace />;
   }
@@ -157,43 +159,268 @@ function AppContent() {
         <Route element={<ProtectedRoute allowedRoles={['student']} allowPasswordChange />}>
           <Route path="/student/change-password" element={<ChangePasswordPage />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={['receptionist']} allowPasswordChange />}>
-          <Route path="/receptionist/change-password" element={<ChangePasswordPage />} />
-        </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+        {/* Shared Admin shell. Admins and receptionists both live here: a
+            receptionist opens the same pages an Admin uses (no duplicate
+            portal). Every page is additionally gated by RequireModule, which
+            checks the receptionist's stored permission set before rendering.
+            The backend re-checks all of this server-side. */}
+        <Route element={<ProtectedRoute allowedRoles={['admin', 'receptionist']} />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="students" element={<StudentManagement />} />
-            <Route path="students/:studentId" element={<StudentProfilePage />} />
-            <Route path="teachers" element={<TeacherManagement />} />
-            <Route path="classes" element={<ClassManagement />} />
-            <Route path="subjects" element={<SubjectManagement />} />
-            <Route path="timetable" element={<TimetableManagement />} />
-            <Route path="attendance" element={<AttendanceManagement />} />
-            <Route path="events" element={<EventsHolidays />} />
-            <Route path="payroll" element={<PayrollManagement />} />
-            <Route path="fees/fee-structure" element={<FeeStructurePage />} />
-            <Route path="fees/collect-fee" element={<CollectFeePage />} />
-            <Route path="fees/student-fee-details" element={<StudentFeeDetailsPage />} />
-            <Route path="fees/reports" element={<FeeReportsPage />} />
-            <Route path="fees/outstanding-dues" element={<OutstandingDuesPage />} />
-            <Route path="fees/voucher-generation" element={<FeeVoucherGenerationPage />} />
-            <Route path="communication/sms" element={<SmsRouteGuard><SmsPage /></SmsRouteGuard>} />
-            <Route path="communication/notices" element={<NoticesPage />} />
-            <Route path="communication/notifications" element={<NotificationsPage />} />
-            <Route path="settings" element={<SchoolSettings />} />
-            <Route path="exams/setup" element={<ExamSetupPage />} />
-            <Route path="exams/subjects-marks" element={<SubjectMarksPage />} />
-            <Route path="exams/schedule" element={<ExamSchedulePage />} />
-            <Route path="exams/marks-entry" element={<MarksEntryPage />} />
-            <Route path="exams/admit-card" element={<AdmitCardPage />} />
-            <Route path="exams/results" element={<ResultsPage />} />
-            <Route path="exams/result-history" element={<ResultHistoryPage />} />
-            <Route path="accounts/all" element={<AllAccountsPage />} />
-            <Route path="accounts/create" element={<CreateAccountPage />} />
-            <Route path="accounts/access" element={<AccountAccessPage />} />
-            <Route path="accounts/receptionists" element={<ReceptionistAccountsPage />} />
+            <Route
+              index
+              element={
+                <RequireModule module="dashboard">
+                  <AdminDashboard />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="students"
+              element={
+                <RequireModule module="student-management">
+                  <StudentManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="students/:studentId"
+              element={
+                <RequireModule module="student-management" page="all-students">
+                  <StudentProfilePage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="teachers"
+              element={
+                <RequireModule module="teacher-management">
+                  <TeacherManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="classes"
+              element={
+                <RequireModule module="class-management">
+                  <ClassManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="subjects"
+              element={
+                <RequireModule module="subject-management">
+                  <SubjectManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="timetable"
+              element={
+                <RequireModule module="timetable-management">
+                  <TimetableManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="attendance"
+              element={
+                <RequireModule module="attendance-management">
+                  <AttendanceManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="events"
+              element={
+                <RequireModule module="events-and-holidays">
+                  <EventsHolidays />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="payroll"
+              element={
+                <RequireModule module="payroll-management">
+                  <PayrollManagement />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/fee-structure"
+              element={
+                <RequireModule module="fee-management" page="fee-structure">
+                  <FeeStructurePage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/collect-fee"
+              element={
+                <RequireModule module="fee-management" page="collect-fee">
+                  <CollectFeePage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/student-fee-details"
+              element={
+                <RequireModule module="fee-management" page="student-fee-details">
+                  <StudentFeeDetailsPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/reports"
+              element={
+                <RequireModule module="fee-management" page="reports">
+                  <FeeReportsPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/outstanding-dues"
+              element={
+                <RequireModule module="fee-management" page="outstanding-dues">
+                  <OutstandingDuesPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/voucher-generation"
+              element={
+                <RequireModule module="fee-management" page="voucher-generation">
+                  <FeeVoucherGenerationPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="communication/sms"
+              element={
+                <RequireModule module="communication" page="sms">
+                  <SmsRouteGuard>
+                    <SmsPage />
+                  </SmsRouteGuard>
+                </RequireModule>
+              }
+            />
+            <Route
+              path="communication/notices"
+              element={
+                <RequireModule module="communication" page="notices">
+                  <NoticesPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="communication/notifications"
+              element={
+                <RequireModule module="communication" page="notifications">
+                  <NotificationsPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RequireModule module="school-settings">
+                  <SchoolSettings />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/setup"
+              element={
+                <RequireModule module="exam-management" page="exam-setup">
+                  <ExamSetupPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/subjects-marks"
+              element={
+                <RequireModule module="exam-management" page="subjects-marks">
+                  <SubjectMarksPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/schedule"
+              element={
+                <RequireModule module="exam-management" page="exam-schedule">
+                  <ExamSchedulePage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/marks-entry"
+              element={
+                <RequireModule module="exam-management" page="marks-entry">
+                  <MarksEntryPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/admit-card"
+              element={
+                <RequireModule module="exam-management" page="admit-card">
+                  <AdmitCardPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/results"
+              element={
+                <RequireModule module="exam-management" page="results">
+                  <ResultsPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="exams/result-history"
+              element={
+                <RequireModule module="exam-management" page="result-history">
+                  <ResultHistoryPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="accounts/all"
+              element={
+                <RequireModule module="user-accounts" page="all-accounts">
+                  <AllAccountsPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="accounts/create"
+              element={
+                <RequireModule module="user-accounts" page="create-account">
+                  <CreateAccountPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="accounts/access"
+              element={
+                <RequireModule module="user-accounts" page="account-access">
+                  <AccountAccessPage />
+                </RequireModule>
+              }
+            />
+            {/* Receptionist Management: Admin-only. The route guard here and the
+                backend `authorize('admin')` together keep every receptionist
+                (including their own records) out of this module. */}
+            <Route
+              path="receptionists"
+              element={
+                <RequireAdmin>
+                  <ReceptionistManagementPage />
+                </RequireAdmin>
+              }
+            />
+            <Route path="access-denied" element={<AccessDeniedPage />} />
           </Route>
         </Route>
 
@@ -223,67 +450,6 @@ function AppContent() {
             <Route path="attendance" element={<StudentAttendance />} />
             <Route path="notifications" element={<StudentNotifications />} />
             <Route path="notices" element={<StudentNotices />} />
-          </Route>
-        </Route>
-
-        <Route element={<ProtectedRoute allowedRoles={['receptionist']} />}>
-          {/* Pathless parent: each module owns a real URL (/receptionist/students,
-              /receptionist/attendance, ...) that matches the sidebar navigation.
-              Previously these were nested under /receptionist/dashboard, so every
-              sidebar link resolved to an unmatched route and bounced the user back
-              to the dashboard. */}
-          <Route element={<ReceptionistLayout />}>
-            <Route
-              path="/receptionist/dashboard"
-              element={
-                <RequirePermission permission="dashboard.view">
-                  <ReceptionistDashboard />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="/receptionist/students"
-              element={
-                <RequirePermission permission="students.view">
-                  <StudentRecords />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="/receptionist/attendance"
-              element={
-                <RequirePermission permission="attendance.view">
-                  <ReceptionistAttendance />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="/receptionist/fees"
-              element={
-                <RequirePermission permission="fees.view">
-                  <ReceptionistFees />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="/receptionist/notices"
-              element={
-                <RequirePermission permission="notices.view">
-                  <ReceptionistNotices />
-                </RequirePermission>
-              }
-            />
-
-            {/* Genuinely unimplemented modules keep an honest "not available" page
-                instead of silently bouncing to the dashboard. They are static
-                face pages only - no backend endpoint exists behind them, so a
-                receptionist can never read real data here. */}
-            <Route path="/receptionist/admissions" element={<ModuleUnavailable title="Admissions" />} />
-            <Route
-              path="/receptionist/parents"
-              element={<ModuleUnavailable title="Parent / Contact Records" />}
-            />
-            <Route path="/receptionist/reports" element={<ModuleUnavailable title="Reports & Exports" />} />
           </Route>
         </Route>
 

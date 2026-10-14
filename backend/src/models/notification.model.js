@@ -6,6 +6,8 @@ import {
   NOTIFICATION_RECIPIENT_ROLE_VALUES,
   NOTIFICATION_RECIPIENT_PROFILE_MODELS,
   NOTIFICATION_RELATED_MODELS,
+  NOTIFICATION_CATEGORY_VALUES,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 // `Parents`/`Staff` are legacy values kept in the enum so notifications already
@@ -70,6 +72,14 @@ const notificationSchema = new mongoose.Schema(
       enum: { values: NOTIFICATION_SOURCE_VALUES, message: '{VALUE} is not a valid notification source' },
       default: NOTIFICATION_SOURCES.MANUAL,
     },
+    // Bell category (Receptionist Notification Bell and future portal filters).
+    // Manual/admin broadcasts default to `General`; the engine's permissioned
+    // receptionist fan-out always stores the category it fanned out on.
+    category: {
+      type: String,
+      enum: { values: NOTIFICATION_CATEGORY_VALUES, message: '{VALUE} is not a valid notification category' },
+      default: NOTIFICATION_CATEGORIES.GENERAL,
+    },
     // Single resolved recipient. Always filled by the Notification Engine
     // from the database (never from a client supplied id), and left unset for
     // the existing audience/ class based manual broadcasts.
@@ -127,6 +137,7 @@ notificationSchema.index({ createdAt: -1 });
 // never deduped), recipient inbox reads, type feeds and related-entity lookups.
 notificationSchema.index({ eventKey: 1 }, { unique: true, sparse: true });
 notificationSchema.index({ 'recipient.user': 1, createdAt: -1 });
+notificationSchema.index({ 'recipient.user': 1, category: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, createdAt: -1 });
 notificationSchema.index({ 'relatedEntity.model': 1, 'relatedEntity.id': 1 });
 

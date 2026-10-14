@@ -7,21 +7,21 @@ import {
 } from '../controllers/feeStructure.controller.js';
 import { validateCreateFeeStructure, validateUpdateFeeStructure } from '../validations/feeStructure.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'fee-structure'),
   getAllFeeStructures,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'fee-structure'),
   validateCreateFeeStructure,
   createFeeStructure,
 );
@@ -29,7 +29,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'fee-structure'),
   validateUpdateFeeStructure,
   updateFeeStructure,
 );
@@ -37,7 +37,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'fee-structure'),
   deleteFeeStructure,
 );
 

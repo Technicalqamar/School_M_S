@@ -1,54 +1,66 @@
 import { useState } from 'react';
 import { useTranslation } from '../../hooks/useLocalization';
+import { useAuth } from '../../contexts/AuthContext';
+import { filterTabsByPermission } from '../../constants/receptionistPermissions';
 import AllClasses from './tabs/AllClasses';
 import AddClass from './tabs/AddClass';
 import ClassDetails from './tabs/ClassDetails';
 
 const ClassManagement = () => {
   const { t } = useTranslation();
-  const tabs = [t('allClasses'), t('addNewClass'), t('classDetails')];
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const { user } = useAuth();
+
+  const allTabs = [
+    { key: 'All Classes', label: t('allClasses') },
+    { key: 'Add New Class', label: t('addNewClass') },
+    { key: 'Class Details', label: t('classDetails') },
+  ];
+  const tabComponents = {
+    'All Classes': AllClasses,
+    'Add New Class': AddClass,
+    'Class Details': ClassDetails,
+  };
+
+  const tabs = filterTabsByPermission(user, 'class-management', allTabs);
+  const [activeTab, setActiveTab] = useState(allTabs[0].key);
   const [selectedClass, setSelectedClass] = useState(null);
   const [editingClass, setEditingClass] = useState(null);
 
-  const tabComponents = {
-    [tabs[0]]: AllClasses,
-    [tabs[1]]: AddClass,
-    [tabs[2]]: ClassDetails,
-  };
+  if (tabs.length === 0) return null;
+  const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : tabs[0].key;
 
-  const ActiveComponent = tabComponents[activeTab];
+  const ActiveComponent = tabComponents[currentTab];
 
   const handleViewDetails = (classData) => {
     setSelectedClass(classData);
-    setActiveTab(tabs[2]);
+    setActiveTab('Class Details');
   };
 
   const handleEditClass = (classData) => {
     setEditingClass(classData);
-    setActiveTab(tabs[1]);
+    setActiveTab('Add New Class');
   };
 
   const handleAddSuccess = () => {
     setEditingClass(null);
-    setActiveTab(tabs[0]);
+    setActiveTab('All Classes');
   };
 
   const handleBackToAll = () => {
     setSelectedClass(null);
-    setActiveTab(tabs[0]);
+    setActiveTab('All Classes');
   };
 
   const componentProps = {};
-  if (activeTab === tabs[0]) {
+  if (currentTab === 'All Classes') {
     componentProps.onViewDetails = handleViewDetails;
     componentProps.onEditClass = handleEditClass;
   }
-  if (activeTab === tabs[1]) {
+  if (currentTab === 'Add New Class') {
     componentProps.editData = editingClass;
     componentProps.onSuccess = handleAddSuccess;
   }
-  if (activeTab === tabs[2]) {
+  if (currentTab === 'Class Details') {
     componentProps.classData = selectedClass;
     componentProps.onBack = handleBackToAll;
   }
@@ -59,21 +71,21 @@ const ClassManagement = () => {
         <nav className="flex gap-1 min-w-max">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); if (tab !== tabs[1]) setEditingClass(null); if (tab !== tabs[2]) setSelectedClass(null); }}
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key); if (tab.key !== 'Add New Class') setEditingClass(null); if (tab.key !== 'Class Details') setSelectedClass(null); }}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === tab
+                currentTab === tab.key
                   ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </nav>
       </div>
 
-      <ActiveComponent key={activeTab === tabs[1] ? editingClass?._id || 'add-class' : activeTab === tabs[2] ? selectedClass?._id || 'no-class' : undefined} {...componentProps} />
+      <ActiveComponent key={currentTab === 'Add New Class' ? editingClass?._id || 'add-class' : currentTab === 'Class Details' ? selectedClass?._id || 'no-class' : undefined} {...componentProps} />
     </div>
   );
 };

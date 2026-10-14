@@ -13,8 +13,6 @@ const createReceptionist = asyncHandler(async (req, res) => {
     message: 'Receptionist account created successfully',
     data: {
       receptionist: result.receptionist,
-      // Short-lived plaintext shown once to the creating Admin. Never stored.
-      temporaryCredentials: result.temporaryCredentials,
     },
   });
 });
@@ -92,11 +90,17 @@ const updateReceptionistPermissions = asyncHandler(async (req, res) => {
 
 const resetReceptionistPassword = asyncHandler(async (req, res) => {
   const { newPassword } = req.body;
-  await receptionistService.resetReceptionistPassword(req.params.id, newPassword, req.user?._id);
+  const receptionist = await receptionistService.resetReceptionistPassword(
+    req.params.id,
+    newPassword,
+    req.user?._id,
+    req.user?.role,
+  );
 
   return res.status(200).json({
     success: true,
-    message: 'Password reset successfully. The receptionist must set a new password on next login.',
+    message: 'Receptionist password reset successfully',
+    data: { receptionist },
   });
 });
 
@@ -110,82 +114,6 @@ const deleteReceptionist = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Portal endpoints (mounted behind protect + authorize('receptionist') +
-// requirePermission(...)). Each handler is separately permission-gated by its
-// route, so a missing permission is denied before the handler runs.
-// ---------------------------------------------------------------------------
-
-const getDashboard = asyncHandler(async (req, res) => {
-  const data = await receptionistService.getPortalDashboard();
-
-  return res.status(200).json({
-    success: true,
-    message: 'Dashboard data fetched successfully',
-    data,
-  });
-});
-
-const getStudents = asyncHandler(async (req, res) => {
-  const result = await receptionistService.getPortalStudents(req.query);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Students fetched successfully',
-    data: result,
-  });
-});
-
-const getStudentByStudentId = asyncHandler(async (req, res) => {
-  const student = await receptionistService.getPortalStudent(req.params.studentId);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Student fetched successfully',
-    data: { student },
-  });
-});
-
-const getPortalNotices = asyncHandler(async (req, res) => {
-  const result = await receptionistService.getPortalNotices(req.query);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Notices fetched successfully',
-    data: result,
-  });
-});
-
-const getPortalNoticeById = asyncHandler(async (req, res) => {
-  const notice = await receptionistService.getPortalNotice(req.params.id);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Notice fetched successfully',
-    data: { notice },
-  });
-});
-
-const getPortalAttendance = asyncHandler(async (req, res) => {
-  const result = await receptionistService.getPortalAttendance(req.query);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Attendance fetched successfully',
-    data: result,
-  });
-});
-
-const getPortalFees = asyncHandler(async (req, res) => {
-  const result = await receptionistService.getPortalFees(req.query);
-
-  return res.status(200).json({
-    success: true,
-    message: 'Fee dues fetched successfully',
-    data: result,
-  });
-});
-
 export {
   createReceptionist,
   getAllReceptionists,
@@ -195,11 +123,4 @@ export {
   updateReceptionistPermissions,
   resetReceptionistPassword,
   deleteReceptionist,
-  getDashboard,
-  getStudents,
-  getStudentByStudentId,
-  getPortalNotices,
-  getPortalNoticeById,
-  getPortalAttendance,
-  getPortalFees,
 };

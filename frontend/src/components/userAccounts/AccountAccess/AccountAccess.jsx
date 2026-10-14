@@ -10,9 +10,15 @@ import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal'
 import AccountStatusBadge from '../AccountStatusBadge/AccountStatusBadge';
 import ProfileStatusBadge from '../ProfileStatusBadge/ProfileStatusBadge';
 import userAccountService from '../../../services/userAccount/userAccount.service';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const AccountAccess = () => {
   const { t } = useTranslation();
+  // Password resets stay Admin-only (the backend PATCH /user-accounts/:id/password
+  // route is `authorize('admin')`). Hide the UI for receptionists who hold the
+  // User Accounts module grant but must never reset any account's password.
+  const { role } = useAuth();
+  const isReceptionist = role === 'receptionist';
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [accounts, setAccounts] = useState([]);
@@ -138,13 +144,15 @@ const AccountAccess = () => {
       </td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          <button
-            className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
-            title={t('resetPasswordFor')}
-            onClick={() => openReset(account)}
-          >
-            <KeyIcon className="h-4 w-4" />
-          </button>
+          {!isReceptionist && (
+            <button
+              className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
+              title={t('resetPasswordFor')}
+              onClick={() => openReset(account)}
+            >
+              <KeyIcon className="h-4 w-4" />
+            </button>
+          )}
           <button
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               account.accountStatus === 'Active'
@@ -240,46 +248,48 @@ const AccountAccess = () => {
         loading={actionLoading}
       />
 
-      <Modal isOpen={!!resetAccount} onClose={() => setResetAccount(null)} title={t('resetPasswordFor')} maxWidth="max-w-md">
-        {resetAccount && (
-          <form onSubmit={handleResetPassword} className="space-y-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {resetAccount.userName}{' '}
-              <span className="text-gray-400">({resetAccount.loginId})</span>
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                {t('enterPassword')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder={t('enterPassword')}
-                required
-                autoFocus
-                className="appearance-none block w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-white dark:bg-gray-800 dark:text-white transition-all duration-200"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setResetAccount(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="submit"
-                disabled={actionLoading || !newPassword}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-              >
-                {actionLoading ? t('loading') : t('confirm')}
-              </button>
-            </div>
-          </form>
-        )}
-      </Modal>
+      {!isReceptionist && (
+        <Modal isOpen={!!resetAccount} onClose={() => setResetAccount(null)} title={t('resetPasswordFor')} maxWidth="max-w-md">
+          {resetAccount && (
+            <form onSubmit={handleResetPassword} className="space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {resetAccount.userName}{' '}
+                <span className="text-gray-400">({resetAccount.loginId})</span>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  {t('enterPassword')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder={t('enterPassword')}
+                  required
+                  autoFocus
+                  className="appearance-none block w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm bg-white dark:bg-gray-800 dark:text-white transition-all duration-200"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setResetAccount(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !newPassword}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  {actionLoading ? t('loading') : t('confirm')}
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
+      )}
     </div>
   );
 };

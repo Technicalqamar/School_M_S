@@ -5,11 +5,13 @@ import Admin from '../models/admin.model.js';
 import UserAccount from '../models/userAccount.model.js';
 import Student from '../models/student.model.js';
 import Teacher from '../models/teacher.model.js';
+import Receptionist from '../models/receptionist.model.js';
 import { ApiError } from '../utils/apiError.js';
 import {
   resolveAcademicYear,
   assertNoClassNamesForAudience,
 } from './communicationTargeting.service.js';
+import { hasActionAccess } from '../constants/permissions.js';
 import {
   NOTIFICATION_TYPE_VALUES,
   NOTIFICATION_SOURCE_VALUES,
@@ -17,6 +19,9 @@ import {
   NOTIFICATION_RECIPIENT_ROLES,
   NOTIFICATION_RECIPIENT_ROLE_VALUES,
   NOTIFICATION_AUDIENCE_BY_RECIPIENT_ROLE,
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_CATEGORY_VALUES,
+  NOTIFICATION_CATEGORY_PERMISSION_ACTIONS,
   NOTIFICATION_FANOUT_TARGETS,
   NOTIFICATION_FANOUT_VALUES,
   NOTIFICATION_RELATED_MODELS,
@@ -47,11 +52,12 @@ import {
 //      independently by each of them.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { ADMIN, STUDENT, TEACHER } = NOTIFICATION_RECIPIENT_ROLES;
+const { ADMIN, STUDENT, TEACHER, RECEPTIONIST } = NOTIFICATION_RECIPIENT_ROLES;
 
 const PORTAL_PROFILE = {
   [STUDENT]: { model: Student, modelName: 'Student', idField: 'studentId' },
   [TEACHER]: { model: Teacher, modelName: 'Teacher', idField: 'teacherId' },
+  [RECEPTIONIST]: { model: Receptionist, modelName: 'Receptionist', idField: 'receptionistId' },
 };
 
 const toObjectId = (value) => {
@@ -244,7 +250,11 @@ const resolveRecipient = async (recipient) => {
 
 // Fan-outs are resolved from the database too, so a caller never supplies the
 // member list.
-const resolveFanoutRecipients = async (fanout) => {
+const resolveFanoutRecipients = async (fanout, options = {}) => {
+  if (fanout === NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS) {
+    return resolveReceptionistFanout(options.category);
+  }
+
   if (fanout !== NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS) {
     throw new ApiError(400, `Invalid notification fan-out. Allowed: ${NOTIFICATION_FANOUT_VALUES.join(', ')}`);
   }
@@ -257,6 +267,44 @@ const resolveFanoutRecipients = async (fanout) => {
     profileModel: 'Admin',
     label: admin.email || admin.loginId || admin.fullName,
   }));
+};
+
+// The permissioned receptionist fan-out: every Active receptionist with a portal
+// UserAccount whose stored `notification-bell` permissions include the action
+// for `category`. Both the account link and the permission grant are resolved
+// here from the database - the caller never supplies the member list, and a
+// receptionist without the matching grant never receives the notification.
+const resolveReceptionistFanout = async (category) => {
+  const actionKey = NOTIFICATION_CATEGORY_PERMISSION_ACTIONS[category];
+  if (!actionKey) {
+    throw new ApiError(400, `No notification bell permission is defined for category "${category}"`);
+  }
+
+  const accounts = await UserAccount.find({
+    role: RECEPTIONIST,
+    isActive: true,
+  }).select('_id referenceId referenceModel loginId').lean();
+
+  const profiles = await Receptionist.find({ status: 'Active' })
+    .select('_id receptionistId permissions')
+    .lean();
+  const profileById = new Map(profiles.map((profile) => [String(profile._id), profile]));
+
+  const targets = [];
+  for (const account of accounts) {
+    if (account.referenceModel !== 'Receptionist') continue;
+    const profile = profileById.get(String(account.referenceId));
+    if (!profile) continue;
+    if (!hasActionAccess(profile.permissions || [], 'notification-bell', actionKey)) continue;
+    targets.push({
+      role: RECEPTIONIST,
+      user: account._id,
+      profile: profile._id,
+      profileModel: 'Receptionist',
+      label: profile.receptionistId || account.loginId || 'Receptionist',
+    });
+  }
+  return targets;
 };
 
 // ── Recipient authorization ──────────────────────────────────────────────────
@@ -393,8 +441,10 @@ const persistNotification = async (doc) => {
  *   audience,        // broadcast only (existing manual flow)
  *   classNames,      // broadcast only (existing manual flow)
  *   academicYear,    // optional; defaults to the school's current year
+ *   category,        // bell category; defaults to 'General'; required (conceptually)
+ *                    // for the permissioned receptionist fan-out
  *   recipient,       // { role, userId | profileId | studentId | teacherId | email }
- *   fanout,          // 'all-admins' (resolved by the engine)
+ *   fanout,          // 'all-admins' | 'permissioned-receptionists'
  *   relatedEntity,   // { model, id, label? }
  *   actor,           // authenticated principal (req.user) or admin id
  *   eventKey,        // optional extra idempotency component
@@ -412,6 +462,7 @@ const createNotification = async (input = {}) => {
     audience,
     classNames,
     academicYear,
+    category,
     recipient,
     fanout,
     relatedEntity,
@@ -443,17 +494,34 @@ const createNotification = async (input = {}) => {
   // 3. Actor (verified when only an id is supplied).
   const principal = await resolveActor(actor);
 
+  // 3b. Category (bell filtering). Manual/broadcast and targeted notifications
+  // default to 'General'; the permissioned receptionist fan-out always resolves
+  // its recipients by this value.
+  const categoryValue = category === undefined || category === null || !String(category).trim()
+    ? NOTIFICATION_CATEGORIES.GENERAL
+    : String(category).trim();
+  if (!NOTIFICATION_CATEGORY_VALUES.includes(categoryValue)) {
+    throw new ApiError(400, `Invalid notification category. Allowed: ${NOTIFICATION_CATEGORY_VALUES.join(', ')}`);
+  }
+
   // 4. Recipients: targeted, fan-out, or the existing broadcast flow.
   if (recipient && fanout) {
     throw new ApiError(400, 'Provide either a recipient or a fan-out, not both');
   }
 
   const targets = fanout
-    ? await resolveFanoutRecipients(fanout)
+    ? await resolveFanoutRecipients(fanout, { category: categoryValue })
     : recipient
       ? [await resolveRecipient(recipient)]
       : [];
   targets.forEach((target) => authorizeRecipient(principal, target));
+
+  // The permissioned receptionist fan-out is skip-if-empty: when no receptionist
+  // holds the matching bell permission there is nothing to address, and a
+  // recipient-less notification would just pollute the admin feed.
+  if (fanout === NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS && !targets.length) {
+    return { notification: null, created: false, notifications: [], createdCount: 0 };
+  }
 
   // 5. Shared context for every document this call produces.
   const year = await resolveAcademicYear(academicYear);
@@ -478,6 +546,7 @@ const createNotification = async (input = {}) => {
       title: String(title).trim(),
       message: String(message).trim(),
       source: requestedSource,
+      category: categoryValue,
       academicYear: year,
       audience: target
         ? NOTIFICATION_AUDIENCE_BY_RECIPIENT_ROLE[target.role]
@@ -580,11 +649,14 @@ const inboxFilter = (principal) => {
 
 const listForPrincipal = async (actor, filters = {}) => {
   const principal = await requirePrincipal(actor);
-  const { page = 1, limit = 10, unreadOnly } = filters;
+  const { page = 1, limit = 10, unreadOnly, categories } = filters;
 
   const filter = inboxFilter(principal);
   if (unreadOnly === true || unreadOnly === 'true' || unreadOnly === '1') {
     filter.readBy = { $ne: principal.userId };
+  }
+  if (Array.isArray(categories) && categories.length) {
+    filter.category = { $in: categories };
   }
 
   const currentPage = Math.max(1, parseInt(page, 10) || 1);
@@ -607,12 +679,16 @@ const listForPrincipal = async (actor, filters = {}) => {
   };
 };
 
-const getUnreadCountForPrincipal = async (actor) => {
+const getUnreadCountForPrincipal = async (actor, options = {}) => {
   const principal = await requirePrincipal(actor);
-  const count = await Notification.countDocuments({
+  const filter = {
     ...inboxFilter(principal),
     readBy: { $ne: principal.userId },
-  });
+  };
+  if (Array.isArray(options.categories) && options.categories.length) {
+    filter.category = { $in: options.categories };
+  }
+  const count = await Notification.countDocuments(filter);
   return { count };
 };
 

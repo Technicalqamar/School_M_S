@@ -12,21 +12,21 @@ import {
   validateTimetableEntryId,
 } from '../validations/timetableEntry.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'create-timetable'),
   getAllTimetableEntries,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'create-timetable'),
   validateTimetableEntryId,
   getTimetableEntryById,
 );
@@ -34,7 +34,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'create-timetable'),
   validateCreateTimetableEntry,
   createTimetableEntry,
 );
@@ -42,7 +42,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'create-timetable'),
   validateTimetableEntryId,
   validateUpdateTimetableEntry,
   updateTimetableEntry,
@@ -51,7 +51,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'create-timetable'),
   validateTimetableEntryId,
   deleteTimetableEntry,
 );

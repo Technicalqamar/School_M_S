@@ -32,13 +32,32 @@ const validatePermissions = (permissions) => {
 };
 
 const validateCreateReceptionist = (req, res, next) => {
-  const { fullName, email, phone, isActive, permissions } = req.body || {};
+  const { fullName, email, phone, isActive, permissions, receptionistId, password } = req.body || {};
 
   if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 3) {
     throw new ApiError(400, 'Full name must be at least 3 characters');
   }
   if (fullName.trim().length > 100) {
     throw new ApiError(400, 'Full name must be at most 100 characters');
+  }
+
+  // The Admin enters the login ID manually. Uniqueness is checked in the
+  // service (and enforced again by the UserAccount loginId unique index).
+  if (!receptionistId || typeof receptionistId !== 'string' || !receptionistId.trim()) {
+    throw new ApiError(400, 'Receptionist ID (login ID) is required');
+  }
+  if (receptionistId.trim().length > 50) {
+    throw new ApiError(400, 'Receptionist ID must be at most 50 characters');
+  }
+
+  if (!password || typeof password !== 'string' || password.length === 0) {
+    throw new ApiError(400, 'Password is required');
+  }
+  if (password.length < 6) {
+    throw new ApiError(400, 'Password must be at least 6 characters');
+  }
+  if (password.length > 128) {
+    throw new ApiError(400, 'Password must be at most 128 characters');
   }
 
   validateOptionalEmail(email);
@@ -91,18 +110,27 @@ const validateReceptionistStatus = (req, res, next) => {
   next();
 };
 
-const validateReceptionistPassword = (req, res, next) => {
-  const { newPassword } = req.body || {};
-  if (!newPassword || newPassword.length < 6) {
-    throw new ApiError(400, 'Password must be at least 6 characters');
-  }
-  next();
-};
-
 const validateReceptionistObjectId = (req, res, next) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new ApiError(400, 'Invalid ID format');
+  }
+  next();
+};
+
+// Password reset form: a required new password validated with the same rules as
+// the create form (6-128 characters). The plaintext never leaves the request
+// body unvalidated and is never stored, logged or returned.
+const validateReceptionistPasswordReset = (req, res, next) => {
+  const { newPassword } = req.body || {};
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+    throw new ApiError(400, 'New password is required');
+  }
+  if (newPassword.length < 6) {
+    throw new ApiError(400, 'New password must be at least 6 characters');
+  }
+  if (newPassword.length > 128) {
+    throw new ApiError(400, 'New password must be at most 128 characters');
   }
   next();
 };
@@ -112,6 +140,6 @@ export {
   validateUpdateReceptionist,
   validateUpdatePermissions,
   validateReceptionistStatus,
-  validateReceptionistPassword,
   validateReceptionistObjectId,
+  validateReceptionistPasswordReset,
 };

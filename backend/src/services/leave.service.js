@@ -8,6 +8,7 @@ import {
   NOTIFICATION_TYPES,
   NOTIFICATION_RECIPIENT_ROLES,
   NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 const VALID_LEAVE_STATUSES = ['Pending', 'Approved', 'Rejected'];
@@ -195,6 +196,22 @@ const createLeave = async (data, userId) => {
       title: 'New leave request',
       message: `${roleLabel} ${mapped.name} (${mapped.personId}) requested leave from ${normalizeDateStr(leave.fromDate)} to ${normalizeDateStr(leave.toDate)}.${mapped.class ? ` Class: ${mapped.class}.` : ''} Reason: ${leave.reason}`,
       fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+      academicYear,
+      relatedEntity: { model: 'Leave', id: leave._id, label: mapped.personId },
+    });
+
+    // The permissioned receptionist fan-out carries the matching bell category
+    // (Student Leave / Teacher Leave). The engine resolves each recipient from
+    // their stored `notification-bell` permissions and is a no-op when none of
+    // the receptionists is granted that category.
+    await notificationEngine.notify({
+      type: NOTIFICATION_TYPES.LEAVE_REQUESTED,
+      title: 'New leave request',
+      message: `${roleLabel} ${mapped.name} (${mapped.personId}) requested leave from ${normalizeDateStr(leave.fromDate)} to ${normalizeDateStr(leave.toDate)}.${mapped.class ? ` Class: ${mapped.class}.` : ''} Reason: ${leave.reason}`,
+      fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+      category: type === 'Student'
+        ? NOTIFICATION_CATEGORIES.STUDENT_LEAVE
+        : NOTIFICATION_CATEGORIES.TEACHER_LEAVE,
       academicYear,
       relatedEntity: { model: 'Leave', id: leave._id, label: mapped.personId },
     });

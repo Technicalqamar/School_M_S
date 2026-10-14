@@ -10,6 +10,7 @@ import notificationEngine from './notificationEngine.service.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 const CLASS_TO_FEE_CLASS = {
@@ -196,6 +197,21 @@ const collectFee = async (data) => {
     title: 'Fee collected',
     message: `${Number(payment.amountPaid).toLocaleString('en-US')} collected from ${payment.studentName} (${payment.studentId}), ${payment.className} — ${payment.feeType} for ${payment.month || payment.exam || academicYear}. Receipt ${payment.receiptId} via ${payment.paymentMethod}.${payment.remainingAmount > 0 ? ` Balance left: ${Number(payment.remainingAmount).toLocaleString('en-US')}.` : ''}`,
     fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+    academicYear: payment.academicYear,
+    relatedEntity: {
+      model: 'FeeCollection',
+      id: payment._id,
+      label: payment.receiptId,
+    },
+  });
+
+  // Same event fan-out to receptionists granted the "other" bell category.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.FEE_COLLECTED,
+    title: 'Fee collected',
+    message: `${Number(payment.amountPaid).toLocaleString('en-US')} collected from ${payment.studentName} (${payment.studentId}), ${payment.className} — ${payment.feeType} for ${payment.month || payment.exam || academicYear}. Receipt ${payment.receiptId} via ${payment.paymentMethod}.${payment.remainingAmount > 0 ? ` Balance left: ${Number(payment.remainingAmount).toLocaleString('en-US')}.` : ''}`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+    category: NOTIFICATION_CATEGORIES.GENERAL,
     academicYear: payment.academicYear,
     relatedEntity: {
       model: 'FeeCollection',

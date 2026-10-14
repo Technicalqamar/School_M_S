@@ -79,6 +79,17 @@ const sanitizeAccount = (doc) => {
   return obj;
 };
 
+// Only an Admin may operate on Receptionist account records. A receptionist who
+// holds User Accounts module access may manage Student/Teacher accounts, but can
+// never view, modify, activate/deactivate, delete or reset a receptionist
+// account (including their own). Those operations remain Admin-only, enforced
+// server-side regardless of what the UI shows.
+const assertReceptionistAccountManageable = (account, performerRole) => {
+  if (performerRole && performerRole !== 'admin' && account.role === 'receptionist') {
+    throw new ApiError(403, 'Receptionist accounts can only be managed by an Administrator');
+  }
+};
+
 /**
  * Core account builder shared by the manual admin flow and automatic creation
  * triggered when a new Student/Teacher profile is created. It rejects the
@@ -258,7 +269,7 @@ const getAllAccounts = async (query) => {
   };
 };
 
-const getAccountById = async (accountId) => {
+const getAccountById = async (accountId, performerRole = null) => {
   if (!mongoose.Types.ObjectId.isValid(accountId)) {
     throw new ApiError(400, 'Invalid account ID');
   }
@@ -266,15 +277,17 @@ const getAccountById = async (accountId) => {
   if (!account) {
     throw new ApiError(404, 'Account not found');
   }
+  assertReceptionistAccountManageable(account, performerRole);
   const profile = await resolveProfile(account);
   return buildAccountResponse(account, profile);
 };
 
-const updateAccount = async (accountId, data, performedBy) => {
+const updateAccount = async (accountId, data, performedBy, performerRole = null) => {
   const account = await UserAccount.findById(accountId);
   if (!account) {
     throw new ApiError(404, 'Account not found');
   }
+  assertReceptionistAccountManageable(account, performerRole);
 
   const allowed = ['email', 'phone', 'fullName', 'profileImage', 'profileImagePublicId', 'isActive'];
 
@@ -291,11 +304,12 @@ const updateAccount = async (accountId, data, performedBy) => {
   return buildAccountResponse(account, profile);
 };
 
-const updateAccountStatus = async (accountId, isActive, performedBy) => {
+const updateAccountStatus = async (accountId, isActive, performedBy, performerRole = null) => {
   const account = await UserAccount.findById(accountId);
   if (!account) {
     throw new ApiError(404, 'Account not found');
   }
+  assertReceptionistAccountManageable(account, performerRole);
 
   const newStatus = Boolean(isActive);
   if (account.isActive === newStatus) {
@@ -311,7 +325,7 @@ const updateAccountStatus = async (accountId, isActive, performedBy) => {
   return buildAccountResponse(account, profile);
 };
 
-const updatePassword = async (accountId, newPassword, performedBy) => {
+const updatePassword = async (accountId, newPassword, performedBy, performerRole = null) => {
   if (!newPassword || newPassword.length < 6) {
     throw new ApiError(400, 'Password must be at least 6 characters');
   }
@@ -319,6 +333,7 @@ const updatePassword = async (accountId, newPassword, performedBy) => {
   if (!account) {
     throw new ApiError(404, 'Account not found');
   }
+  assertReceptionistAccountManageable(account, performerRole);
 
   account.password = newPassword;
   // Reset by an admin requires the user to set a new password on next login.
@@ -329,11 +344,12 @@ const updatePassword = async (accountId, newPassword, performedBy) => {
   return true;
 };
 
-const deleteAccount = async (accountId, performedBy) => {
+const deleteAccount = async (accountId, performedBy, performerRole = null) => {
   const account = await UserAccount.findById(accountId);
   if (!account) {
     throw new ApiError(404, 'Account not found');
   }
+  assertReceptionistAccountManageable(account, performerRole);
 
   await UserAccount.deleteOne({ _id: account._id });
   await logAudit('DELETE', account, performedBy);

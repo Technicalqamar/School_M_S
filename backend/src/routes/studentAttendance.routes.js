@@ -14,14 +14,14 @@ import {
 } from '../controllers/studentAttendance.controller.js';
 import { validateSaveAttendance, validateGetAttendance, validateQrScan } from '../validations/studentAttendance.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.post(
   '/qr-scan',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-mark'),
   validateQrScan,
   qrScanAttendance,
 );
@@ -29,28 +29,28 @@ router.post(
 router.get(
   '/students',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-view'),
   getStudentsWithAttendance,
 );
 
 router.get(
   '/history',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'attendance-history-view'),
   getAttendanceHistory,
 );
 
 router.get(
   '/reports',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'attendance-history-view'),
   getAttendanceReports,
 );
 
 router.get(
   '/by-class',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-view'),
   validateGetAttendance,
   getAttendanceByClass,
 );
@@ -58,7 +58,7 @@ router.get(
 router.get(
   '/by-date',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-view'),
   validateGetAttendance,
   getAttendanceByDate,
 );
@@ -66,21 +66,21 @@ router.get(
 router.get(
   '/student/:studentId',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-view'),
   getAttendanceByStudent,
 );
 
 router.patch(
   '/check-in',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-mark'),
   resetCheckIn,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-mark'),
   validateSaveAttendance,
   saveAttendance,
 );
@@ -88,14 +88,14 @@ router.post(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-mark'),
   deleteAttendance,
 );
 
 router.delete(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'student-attendance-mark'),
   deleteBulkAttendance,
 );
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import toast from 'react-hot-toast';
 import { UsersIcon, UserGroupIcon, UserMinusIcon, UserPlusIcon, ArrowPathIcon, ArrowTopRightOnSquareIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import StatCard from '../../common/StatCard/StatCard';
@@ -24,6 +26,12 @@ const ITEMS_PER_PAGE = 10;
 const AllStudents = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Per-action student capabilities: viewing, editing and deleting are granted
+  // separately. Admins always pass; a receptionist needs the exact action
+  // (module/page grants apply through hasReceptionistActionAccess).
+  const canStudent = (actionKey) => hasReceptionistActionAccess(user, 'student-management', actionKey);
 
   const classOptions = [t('allClasses'), ...CLASS_NAMES];
 
@@ -204,9 +212,11 @@ const AllStudents = () => {
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">
           <ActionButtons
-            onView={() => navigate(`/admin/students/${student.studentId}`, { state: { student } })}
-            onEdit={() => setEditingStudent(student)}
-            onDelete={() => setDeletingStudent(student)}
+            onView={canStudent('student-view')
+              ? () => navigate(`/admin/students/${student.studentId}`, { state: { student } })
+              : undefined}
+            onEdit={canStudent('student-edit') ? () => setEditingStudent(student) : undefined}
+            onDelete={canStudent('student-delete') ? () => setDeletingStudent(student) : undefined}
           />
           <button
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-indigo-500/15 cursor-pointer border border-indigo-200 dark:border-indigo-800/50"
@@ -381,9 +391,11 @@ const AllStudents = () => {
                     <StudentCard
                       key={student.studentId}
                       student={student}
-                      onView={() => navigate(`/admin/students/${student.studentId}`, { state: { student } })}
-                      onEdit={() => setEditingStudent(student)}
-                      onDelete={() => setDeletingStudent(student)}
+                      onView={canStudent('student-view')
+                        ? () => navigate(`/admin/students/${student.studentId}`, { state: { student } })
+                        : undefined}
+                      onEdit={canStudent('student-edit') ? () => setEditingStudent(student) : undefined}
+                      onDelete={canStudent('student-delete') ? () => setDeletingStudent(student) : undefined}
                     />
                   ))
                 )}

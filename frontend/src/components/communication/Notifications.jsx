@@ -11,6 +11,8 @@ import Button from '../common/Button/Button';
 import StatCard from '../common/StatCard/StatCard';
 import ClassSelector from './ClassSelector';
 import notificationService from '../../services/communication/notification.service';
+import { useAuth } from '../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../constants/receptionistPermissions';
 import {
   getAudienceLabel,
   formatDateTime,
@@ -29,6 +31,8 @@ const initialForm = {
 
 const Notifications = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const canNotification = (actionKey) => hasReceptionistActionAccess(user, 'communication', actionKey);
 
   const [notifications, setNotifications] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalItems: 0 });
@@ -232,10 +236,12 @@ const Notifications = () => {
       </div>
 
       <div className="mt-6 flex justify-end">
-        <Button onClick={() => { setForm({ ...initialForm }); setFormError(''); setFormOpen(true); }} className="w-auto px-5">
-          <PlusIcon className="h-4 w-4 mr-2" />
-          {t('createNotification')}
-        </Button>
+        {canNotification('notifications-create') && (
+          <Button onClick={() => { setForm({ ...initialForm }); setFormError(''); setFormOpen(true); }} className="w-auto px-5">
+            <PlusIcon className="h-4 w-4 mr-2" />
+            {t('createNotification')}
+          </Button>
+        )}
       </div>
 
       <div className="mt-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -340,9 +346,11 @@ const Notifications = () => {
                         <button onClick={() => setViewNotification(notification)} className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer" title={t('view')}>
                           <EyeIcon className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteTarget(notification)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {canNotification('notifications-delete') && (
+                          <button onClick={() => setDeleteTarget(notification)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

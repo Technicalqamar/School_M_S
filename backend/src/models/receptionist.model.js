@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import Counter from './counter.model.js';
 import { DEFAULT_RECEPTIONIST_PERMISSIONS } from '../constants/permissions.js';
 
 // Receptionist profile. Mirrors the Student/Teacher pattern: the profile holds
@@ -11,7 +10,9 @@ const receptionistSchema = new mongoose.Schema(
   {
     receptionistId: {
       type: String,
+      required: [true, 'Receptionist ID is required'],
       unique: true,
+      trim: true,
     },
     fullName: {
       type: String,
@@ -50,13 +51,6 @@ const receptionistSchema = new mongoose.Schema(
 );
 
 receptionistSchema.index({ status: 1 });
-
-receptionistSchema.pre('save', async function () {
-  if (this.isNew && !this.receptionistId) {
-    const seq = await Counter.increment('receptionistId');
-    this.receptionistId = `REC-${String(seq).padStart(6, '0')}`;
-  }
-});
 
 const Receptionist = mongoose.model('Receptionist', receptionistSchema);
 

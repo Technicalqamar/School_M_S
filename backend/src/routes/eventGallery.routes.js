@@ -9,7 +9,7 @@ import {
   getGalleryImageById,
 } from '../controllers/eventGallery.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 import { createUploader } from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
@@ -18,21 +18,21 @@ const galleryUpload = createUploader('event-gallery');
 router.get(
   '/event/:eventId',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-view'),
   getGalleryByEvent,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-view'),
   getGalleryImageById,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-create'),
   galleryUpload.single('image'),
   uploadGalleryImage,
 );
@@ -40,7 +40,7 @@ router.post(
 router.post(
   '/bulk',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-create'),
   galleryUpload.array('images', 20),
   bulkUploadGalleryImages,
 );
@@ -48,21 +48,21 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-create'),
   updateGalleryImage,
 );
 
 router.delete(
   '/event/:eventId',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-create'),
   deleteGalleryImagesByEvent,
 );
 
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('events-and-holidays', 'event-gallery-create'),
   deleteGalleryImage,
 );
 

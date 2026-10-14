@@ -119,6 +119,15 @@ const userAccountLogin = async (loginId, password, expectedRole = null) => {
     throw new ApiError(403, 'Your profile is inactive. Contact the administration.');
   }
 
+  // Receptionists use the Admin-assigned password for the life of the account;
+  // there is no password-change/reset flow for this role. Legacy accounts
+  // created under the old "must change password on first login" flow have the
+  // flag cleared here so they are never locked out of the allowlisted paths
+  // (and `changePassword` now rejects receptionists anyway).
+  if (account.role === 'receptionist' && account.mustChangePassword === true) {
+    account.mustChangePassword = false;
+  }
+
   account.lastLogin = new Date();
   await account.save();
 

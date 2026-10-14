@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeftIcon, XMarkIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import StatusBadge from '../../common/StatusBadge/StatusBadge';
 import SelectInput from '../../common/SelectInput/SelectInput';
 import Button from '../../common/Button/Button';
@@ -9,6 +11,10 @@ import teacherService from '../../../services/teacher/teacher.service';
 
 const ClassDetails = ({ classData, onBack }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  // Teacher/Subject assignment is a class-edit operation on the backend
+  // (POST/DELETE /classes/:id/teacher-assignments), so the assign UI is gated.
+  const canEditClass = hasReceptionistActionAccess(user, 'class-management', 'class-edit');
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -225,6 +231,7 @@ const ClassDetails = ({ classData, onBack }) => {
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-4 pb-3 border-b border-gray-100 dark:border-gray-700">{t('assignedTeachers')}</h3>
 
+          {canEditClass && (
           <form onSubmit={handleAssign} className="space-y-3 pb-4 mb-4 border-b border-gray-100 dark:border-gray-700">
             <SelectInput
               label={t('selectTeacher')}
@@ -257,6 +264,7 @@ const ClassDetails = ({ classData, onBack }) => {
               <p className="text-[11px] text-amber-600 dark:text-amber-400">{t('allSubjectsAssigned')}</p>
             ) : null}
           </form>
+          )}
 
           {actionMsg.text && (
             <p className={`mb-3 px-3 py-2 rounded-lg text-xs ${
@@ -287,15 +295,17 @@ const ClassDetails = ({ classData, onBack }) => {
                       return (
                         <span key={subject._id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 text-[11px] font-medium text-blue-700 dark:text-blue-300">
                           {subject.subjectName}
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(entry.teacher._id, subject._id)}
-                            disabled={removingId === removeId}
-                            className="p-0.5 rounded hover:bg-blue-200/60 dark:hover:bg-blue-800/50 transition-colors cursor-pointer disabled:opacity-40"
-                            aria-label={t('remove')}
-                          >
-                            <XMarkIcon className="h-3 w-3" />
-                          </button>
+                          {canEditClass && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(entry.teacher._id, subject._id)}
+                              disabled={removingId === removeId}
+                              className="p-0.5 rounded hover:bg-blue-200/60 dark:hover:bg-blue-800/50 transition-colors cursor-pointer disabled:opacity-40"
+                              aria-label={t('remove')}
+                            >
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
+                          )}
                         </span>
                       );
                     })}

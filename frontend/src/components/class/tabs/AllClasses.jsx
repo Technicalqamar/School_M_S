@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import { BookOpenIcon, CheckCircleIcon, XCircleIcon, UsersIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import StatCard from '../../common/StatCard/StatCard';
 import FilterDropdown from '../../common/FilterDropdown/FilterDropdown';
@@ -17,6 +19,8 @@ const ITEMS_PER_PAGE = 10;
 
 const AllClasses = ({ onViewDetails, onEditClass }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const canClass = (actionKey) => hasReceptionistActionAccess(user, 'class-management', actionKey);
   const statusOptions = [t('all'), t('active'), t('inactive')];
   const [view, setView] = useState('table');
   const [academicYearFilter, setAcademicYearFilter] = useState(t('selectYear'));
@@ -136,9 +140,9 @@ const AllClasses = ({ onViewDetails, onEditClass }) => {
       </td>
       <td className="px-4 py-3 text-right">
         <ActionButtons
-          onView={() => onViewDetails(classData)}
-          onEdit={() => onEditClass(classData)}
-          onDelete={() => setDeletingClass(classData)}
+          onView={canClass('class-view') ? () => onViewDetails(classData) : undefined}
+          onEdit={canClass('class-edit') ? () => onEditClass(classData) : undefined}
+          onDelete={canClass('class-delete') ? () => setDeletingClass(classData) : undefined}
         />
       </td>
     </>
@@ -273,9 +277,9 @@ const AllClasses = ({ onViewDetails, onEditClass }) => {
                   <ClassCard
                     key={classData._id}
                     classData={classData}
-                    onView={() => onViewDetails(classData)}
-                    onEdit={() => onEditClass(classData)}
-                    onDelete={() => setDeletingClass(classData)}
+                    onView={canClass('class-view') ? () => onViewDetails(classData) : undefined}
+                    onEdit={canClass('class-edit') ? () => onEditClass(classData) : undefined}
+                    onDelete={canClass('class-delete') ? () => setDeletingClass(classData) : undefined}
                   />
                 ))}
               </div>

@@ -19,6 +19,8 @@ import teacherAttendanceService from '../../../services/teacherAttendance/teache
 import qrAttendanceService from '../../../services/qrAttendanceService/qrAttendanceService';
 import { getImageUrl } from '../../../utils/imageUrl';
 import UsbQrScanner from './UsbQrScanner';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const STATUS_OPTIONS = ['Present', 'Absent', 'Leave', 'Late'];
 const ATTENDANCE_MODES = ['Manual Attendance', 'QR Scanner'];
@@ -56,6 +58,11 @@ const PAGE_SIZE = 10;
 
 const TeacherAttendance = () => {
   const { localization } = useSchoolConfig();
+  const { user } = useAuth();
+  // Check-in/check-out, manual status edits and record resets are
+  // `teacher-attendance-mark` operations. Viewing only needs
+  // `teacher-attendance-view`.
+  const canMark = hasReceptionistActionAccess(user, 'attendance-management', 'teacher-attendance-mark');
   const hour12 = (localization?.timeFormat || '12') !== '24';
   // Displays the exact stored check-in/check-out timestamp (to the second),
   // converted to local time per the existing project convention.
@@ -336,7 +343,16 @@ const TeacherAttendance = () => {
     );
   };
 
-  const renderStatusDropdown = (teacherId, currentStatus) => (
+  const renderStatusDropdown = (teacherId, currentStatus) => {
+    if (!canMark) {
+      return (
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${STATUS_COLORS[currentStatus]?.text || 'text-gray-700 dark:text-gray-200'}`}>
+          <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[currentStatus]?.dot || 'bg-gray-400'}`} />
+          {currentStatus}
+        </span>
+      );
+    }
+    return (
     <div className="relative">
       <button
         type="button"
@@ -370,7 +386,8 @@ const TeacherAttendance = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const renderPagination = () => {
     if (filteredTeachers.length === 0) return null;
@@ -755,7 +772,7 @@ const TeacherAttendance = () => {
                         >
                           <EyeIcon className="h-4 w-4" />
                         </button>
-                        {canCheckIn ? (
+                        {canMark && (canCheckIn ? (
                           <button
                             onClick={() => runTeacherCheckAction(teacher)}
                             disabled={actionBusyTeacherId === teacher._id}
@@ -779,15 +796,17 @@ const TeacherAttendance = () => {
                           <span className="px-2 py-1.5 text-xs font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap">
                             Checked Out
                           </span>
-                        ) : null}
-                        <button
-                          onClick={() => setResetTarget(teacher._id)}
-                          disabled={!record.id || resetting}
-                          title={record.id ? 'Delete / Reset Attendance record' : 'No attendance record to reset'}
-                          className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <ArrowPathIcon className="h-4 w-4" />
-                        </button>
+                        ) : null)}
+                        {canMark && (
+                          <button
+                            onClick={() => setResetTarget(teacher._id)}
+                            disabled={!record.id || resetting}
+                            title={record.id ? 'Delete / Reset Attendance record' : 'No attendance record to reset'}
+                            className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <ArrowPathIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -931,7 +950,7 @@ const TeacherAttendance = () => {
         </div>
       </div>
 
-      {isScannerMode && (
+      {isScannerMode && canMark && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div>

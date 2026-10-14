@@ -18,6 +18,8 @@ import studentService from '../../../services/student/student.service';
 import teacherService from '../../../services/teacher/teacher.service';
 import { useTranslation } from '../../../hooks/useLocalization';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const PAGE_SIZE = 10;
 const FILTER_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected'];
@@ -162,6 +164,12 @@ const PersonPicker = ({
 const LeaveManagement = () => {
   const { t } = useTranslation();
   const { academic } = useSchoolConfig();
+  const { user } = useAuth();
+
+  // Leave actions are granted per-operation (view/create/edit/delete/approve/
+  // reject). Admins always pass; a receptionist must hold the exact action
+  // (module/page grants apply through hasReceptionistActionAccess).
+  const canLeave = (actionKey) => hasReceptionistActionAccess(user, 'attendance-management', actionKey);
 
   // ── Filters ─────────────────────────────────────────────
   const [type, setType] = useState('All');
@@ -633,7 +641,9 @@ const LeaveManagement = () => {
         <StatCard icon={XCircleIcon} label={t('rejectedLeaves')} value={stats.rejected} color="red" />
       </div>
 
-      {/* Create Leave Form */}
+      {/* Create Leave Form - only rendered when the receptionist holds the
+          leave-create action. A view-only grant never shows the form. */}
+      {canLeave('leave-create') && (
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
         <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
           <PlusIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -749,6 +759,7 @@ const LeaveManagement = () => {
           </div>
         </form>
       </div>
+      )}
 
       {/* Filters + Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
@@ -894,38 +905,46 @@ const LeaveManagement = () => {
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => openEdit(record)}
-                        className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer"
-                        title={t('edit')}
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
+                      {canLeave('leave-edit') && (
+                        <button
+                          onClick={() => openEdit(record)}
+                          className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer"
+                          title={t('edit')}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                      )}
                       {record.status === 'Pending' && (
                         <>
-                          <button
-                            onClick={() => setConfirmAction({ kind: 'approve', leave: record })}
-                            className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer"
-                            title={t('approve')}
-                          >
-                            <CheckCircleIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ kind: 'reject', leave: record })}
-                            className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
-                            title={t('reject')}
-                          >
-                            <XCircleIcon className="h-4 w-4" />
-                          </button>
+                          {canLeave('leave-approve') && (
+                            <button
+                              onClick={() => setConfirmAction({ kind: 'approve', leave: record })}
+                              className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer"
+                              title={t('approve')}
+                            >
+                              <CheckCircleIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canLeave('leave-reject') && (
+                            <button
+                              onClick={() => setConfirmAction({ kind: 'reject', leave: record })}
+                              className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                              title={t('reject')}
+                            >
+                              <XCircleIcon className="h-4 w-4" />
+                            </button>
+                          )}
                         </>
                       )}
-                      <button
-                        onClick={() => setConfirmAction({ kind: 'delete', leave: record })}
-                        className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors cursor-pointer"
-                        title={t('delete')}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {canLeave('leave-delete') && (
+                        <button
+                          onClick={() => setConfirmAction({ kind: 'delete', leave: record })}
+                          className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors cursor-pointer"
+                          title={t('delete')}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -983,26 +1002,30 @@ const LeaveManagement = () => {
               </button>
               {viewLeave.status === 'Pending' && (
                 <>
-                  <button
-                    onClick={() => {
-                      const leave = viewLeave;
-                      setViewLeave(null);
-                      setConfirmAction({ kind: 'approve', leave });
-                    }}
-                    className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircleIcon className="h-3.5 w-3.5" /> {t('approve')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const leave = viewLeave;
-                      setViewLeave(null);
-                      setConfirmAction({ kind: 'reject', leave });
-                    }}
-                    className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <XCircleIcon className="h-3.5 w-3.5" /> {t('reject')}
-                  </button>
+                  {canLeave('leave-approve') && (
+                    <button
+                      onClick={() => {
+                        const leave = viewLeave;
+                        setViewLeave(null);
+                        setConfirmAction({ kind: 'approve', leave });
+                      }}
+                      className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircleIcon className="h-3.5 w-3.5" /> {t('approve')}
+                    </button>
+                  )}
+                  {canLeave('leave-reject') && (
+                    <button
+                      onClick={() => {
+                        const leave = viewLeave;
+                        setViewLeave(null);
+                        setConfirmAction({ kind: 'reject', leave });
+                      }}
+                      className="flex-1 py-2 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <XCircleIcon className="h-3.5 w-3.5" /> {t('reject')}
+                    </button>
+                  )}
                 </>
               )}
             </div>

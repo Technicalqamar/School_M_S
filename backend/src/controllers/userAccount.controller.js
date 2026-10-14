@@ -29,7 +29,7 @@ const getAllAccounts = asyncHandler(async (req, res) => {
 });
 
 const getAccountById = asyncHandler(async (req, res) => {
-  const account = await userAccountService.getAccountById(req.params.id);
+  const account = await userAccountService.getAccountById(req.params.id, req.user?.role);
 
   return res.status(200).json({
     success: true,
@@ -39,7 +39,7 @@ const getAccountById = asyncHandler(async (req, res) => {
 });
 
 const updateAccount = asyncHandler(async (req, res) => {
-  const account = await userAccountService.updateAccount(req.params.id, req.body, req.user?._id);
+  const account = await userAccountService.updateAccount(req.params.id, req.body, req.user?._id, req.user?.role);
 
   return res.status(200).json({
     success: true,
@@ -59,7 +59,7 @@ const updateAccountStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  const account = await userAccountService.updateAccountStatus(id, isActive, req.user?._id);
+  const account = await userAccountService.updateAccountStatus(id, isActive, req.user?._id, req.user?.role);
 
   return res.status(200).json({
     success: true,
@@ -72,7 +72,7 @@ const updatePassword = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
 
-  await userAccountService.updatePassword(id, newPassword, req.user?._id);
+  await userAccountService.updatePassword(id, newPassword, req.user?._id, req.user?.role);
 
   return res.status(200).json({
     success: true,
@@ -81,7 +81,7 @@ const updatePassword = asyncHandler(async (req, res) => {
 });
 
 const deleteAccount = asyncHandler(async (req, res) => {
-  const result = await userAccountService.deleteAccount(req.params.id, req.user?._id);
+  const result = await userAccountService.deleteAccount(req.params.id, req.user?._id, req.user?.role);
 
   return res.status(200).json({
     success: true,

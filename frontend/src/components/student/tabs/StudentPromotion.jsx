@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import CardSection from '../../common/CardSection/CardSection';
 import SelectInput from '../../common/SelectInput/SelectInput';
 import Input from '../../common/Input/Input';
@@ -42,6 +44,11 @@ const safeSplitName = (fullName) => {
 
 const StudentPromotion = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  // Promoting students requires the dedicated student-promote action. The whole
+  // tab already only opens for users with a grant in `student-promotion`, but
+  // the bulk Promote button is additionally hidden when the action is missing.
+  const canPromote = hasReceptionistActionAccess(user, 'student-management', 'student-promote');
   const statusOptions = [t('all'), t('active'), t('inactive')];
   const [fromYear, setFromYear] = useState('');
   const [toYear, setToYear] = useState('');
@@ -354,7 +361,7 @@ const StudentPromotion = () => {
         )}
       </CardSection>
 
-      {loaded && selectedIds.size > 0 && (
+      {loaded && selectedIds.size > 0 && canPromote && (
         <div className="flex items-center justify-end gap-3 pt-2">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {selectedIds.size} {t('studentsSelected')}

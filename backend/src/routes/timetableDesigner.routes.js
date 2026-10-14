@@ -2,7 +2,7 @@ import express from 'express';
 import { getTimetableDesigner } from '../controllers/timetableDesigner.controller.js';
 import { validateTimetableDesignerQuery } from '../validations/timetableDesigner.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ const router = express.Router();
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'designer'),
   validateTimetableDesignerQuery,
   getTimetableDesigner,
 );

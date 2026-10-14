@@ -1,13 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import subjectService from '../../../services/subject/subject.service';
 import { CLASS_NAMES } from '../../../utils/classNames';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 
 const ClassSubjectAssignment = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { academic } = useSchoolConfig();
+  // Saving an assignment hits the subject-assign action on the backend; admins
+  // always pass. The Update button is hidden when the action is not granted.
+  const canAssign = hasReceptionistActionAccess(user, 'subject-management', 'subject-assign');
   const [selectedClass, setSelectedClass] = useState('');
   const [academicYear, setAcademicYear] = useState(() => academic?.currentYear || '');
   const [allSubjects, setAllSubjects] = useState([]);
@@ -235,13 +241,15 @@ const ClassSubjectAssignment = () => {
               </div>
 
               <div className="flex items-center gap-3 pt-5 mt-5 border-t border-gray-100 dark:border-gray-700">
-                <button
-                  onClick={handleUpdate}
-                  disabled={assigning || !hasChanges}
-                  className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {assigning ? t('saving') : t('update')}
-                </button>
+                {canAssign && (
+                  <button
+                    onClick={handleUpdate}
+                    disabled={assigning || !hasChanges}
+                    className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {assigning ? t('saving') : t('update')}
+                  </button>
+                )}
                 <button
                   onClick={handleReset}
                   disabled={assigning || !hasChanges}

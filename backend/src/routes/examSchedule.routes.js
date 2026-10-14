@@ -8,11 +8,11 @@ import {
 } from '../controllers/examSchedule.controller.js';
 import { validateCreateExamSchedule, validateUpdateExamSchedule } from '../validations/examSchedule.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
-router.use(protect, authorize('admin'));
+router.use(protect, requireModuleAccess('exam-management', 'exam-schedule'));
 
 router.get('/', getAllExamSchedules);
 

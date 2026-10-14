@@ -9,6 +9,8 @@ import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal'
 import Button from '../../common/Button/Button';
 import eventsService from '../../../services/events/events.service';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -34,6 +36,8 @@ const getStatusStyle = (status) => {
 const HolidayManagement = ({ onDataChange, editHoliday, onEditHoliday, onClearHolidayEdit }) => {
   const { t } = useTranslation();
   const { academic } = useSchoolConfig();
+  const { user } = useAuth();
+  const canHoliday = (actionKey) => hasReceptionistActionAccess(user, 'events-and-holidays', actionKey);
   const [holidays, setHolidays] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...initialForm, academicYear: academic.currentYear || '' });
@@ -233,13 +237,15 @@ const HolidayManagement = ({ onDataChange, editHoliday, onEditHoliday, onClearHo
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('holiday')}s</h2>
-          <button onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-sm transition-all flex items-center gap-2 cursor-pointer">
-            <PlusIcon className="h-4 w-4" /> {showForm ? t('cancel') : t('addHoliday')}
-          </button>
+          {canHoliday('holiday-create') && (
+            <button onClick={() => setShowForm(!showForm)}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-sm transition-all flex items-center gap-2 cursor-pointer">
+              <PlusIcon className="h-4 w-4" /> {showForm ? t('cancel') : t('addHoliday')}
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {showForm && (isEditing ? canHoliday('holiday-edit') : canHoliday('holiday-create')) && (
           <div className="mb-5 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-200 dark:border-gray-600">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">{isEditing ? t('editHoliday') : t('newHoliday')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4">
@@ -375,12 +381,16 @@ const HolidayManagement = ({ onDataChange, editHoliday, onEditHoliday, onClearHo
                       <button onClick={() => setViewHoliday(h)} className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer" title={t('view')}>
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button onClick={() => onEditHoliday(h)} className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer" title={t('edit')}>
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget(h)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {canHoliday('holiday-edit') && (
+                        <button onClick={() => onEditHoliday(h)} className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer" title={t('edit')}>
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canHoliday('holiday-delete') && (
+                        <button onClick={() => setDeleteTarget(h)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

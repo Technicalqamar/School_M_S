@@ -6,14 +6,14 @@ import {
   validateVoucherIdParam,
 } from '../validations/feeVoucher.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'voucher-generation'),
   validateFetchVouchers,
   getVouchers,
 );
@@ -21,7 +21,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'voucher-generation'),
   validateGenerateVouchers,
   generateVouchers,
 );
@@ -29,7 +29,7 @@ router.post(
 router.get(
   '/:voucherId',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'voucher-generation'),
   validateVoucherIdParam,
   getVoucher,
 );

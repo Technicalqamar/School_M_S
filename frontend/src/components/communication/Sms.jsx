@@ -10,6 +10,8 @@ import Alert from '../common/Alert/Alert';
 import Button from '../common/Button/Button';
 import ClassSelector from './ClassSelector';
 import smsService from '../../services/communication/sms.service';
+import { useAuth } from '../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../constants/receptionistPermissions';
 import {
   getAudienceLabel,
   getStatusStyle,
@@ -22,6 +24,9 @@ const ITEMS_PER_PAGE = 10;
 
 const Sms = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  // Sending (and deleting) SMS is `sms-send`; viewing history is `sms-view`.
+  const canSendSms = hasReceptionistActionAccess(user, 'communication', 'sms-send');
 
   // Compose form
   const [message, setMessage] = useState('');
@@ -181,6 +186,7 @@ const Sms = () => {
       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('smsSubtitle')}</p>
 
       {/* Compose SMS */}
+      {canSendSms && (
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
           <PaperAirplaneIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -240,6 +246,7 @@ const Sms = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* SMS History */}
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -319,9 +326,11 @@ const Sms = () => {
                         <button onClick={() => setViewSms(sms)} className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer" title={t('view')}>
                           <EyeIcon className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteTarget(sms)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {canSendSms && (
+                          <button onClick={() => setDeleteTarget(sms)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

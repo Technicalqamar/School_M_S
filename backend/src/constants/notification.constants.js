@@ -44,18 +44,21 @@ const NOTIFICATION_SOURCES = {
 const NOTIFICATION_SOURCE_VALUES = Object.values(NOTIFICATION_SOURCES);
 
 // A notification is addressed to exactly one principal, never to a list of
-// arbitrary user ids supplied by a request.
+// arbitrary user ids supplied by a request. Receptionists share the Admin
+// panel, so they are a first-class recipient role for the permissioned
+// receptionist fan-out (NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS).
 const NOTIFICATION_RECIPIENT_ROLES = {
   ADMIN: 'admin',
   STUDENT: 'student',
   TEACHER: 'teacher',
+  RECEPTIONIST: 'receptionist',
 };
 
 const NOTIFICATION_RECIPIENT_ROLE_VALUES = Object.values(NOTIFICATION_RECIPIENT_ROLES);
 
 // Collection the recipient's school profile lives in (Admin docs are their own
 // profile; portal users point at their Student/Teacher profile).
-const NOTIFICATION_RECIPIENT_PROFILE_MODELS = ['Admin', 'Student', 'Teacher'];
+const NOTIFICATION_RECIPIENT_PROFILE_MODELS = ['Admin', 'Student', 'Teacher', 'Receptionist'];
 
 // Audience stored on the notification for each targeted recipient role. The
 // existing Admin Notifications page renders and filters by audience, so
@@ -64,6 +67,29 @@ const NOTIFICATION_AUDIENCE_BY_RECIPIENT_ROLE = {
   [NOTIFICATION_RECIPIENT_ROLES.ADMIN]: 'All',
   [NOTIFICATION_RECIPIENT_ROLES.STUDENT]: 'Students',
   [NOTIFICATION_RECIPIENT_ROLES.TEACHER]: 'Teachers',
+  [NOTIFICATION_RECIPIENT_ROLES.RECEPTIONIST]: 'All',
+};
+
+// Categories shown in the Receptionist Notification Bell. They are independent
+// from audiences: a category describes WHAT an automatic notification is about
+// so the bell can filter by permission (a receptionist granted "Student Leave"
+// sees only student-leave notifications). Manual admin broadcasts default to
+// `General`.
+const NOTIFICATION_CATEGORIES = {
+  GENERAL: 'General',
+  STUDENT_LEAVE: 'Student Leave',
+  TEACHER_LEAVE: 'Teacher Leave',
+};
+
+const NOTIFICATION_CATEGORY_VALUES = Object.values(NOTIFICATION_CATEGORIES);
+
+// Maps every category to the `notification-bell` permission action that unlocks
+// it. The server resolves categories from the receptionist's stored permissions
+// (never from client input).
+const NOTIFICATION_CATEGORY_PERMISSION_ACTIONS = {
+  [NOTIFICATION_CATEGORIES.STUDENT_LEAVE]: 'student-leave',
+  [NOTIFICATION_CATEGORIES.TEACHER_LEAVE]: 'teacher-leave',
+  [NOTIFICATION_CATEGORIES.GENERAL]: 'other',
 };
 
 // Entities an automatic notification can point back to. Mirrors the mongoose
@@ -85,6 +111,10 @@ const NOTIFICATION_RELATED_MODELS = [
 // the database; the caller never supplies the member list.
 const NOTIFICATION_FANOUT_TARGETS = {
   ALL_ADMINS: 'all-admins',
+  // Any receptionist whose stored `notification-bell` permissions include the
+  // action for the notification's `category`. Resolved entirely server-side;
+  // the caller supplies only the category.
+  RECEPTIONISTS: 'permissioned-receptionists',
 };
 
 const NOTIFICATION_FANOUT_VALUES = Object.values(NOTIFICATION_FANOUT_TARGETS);
@@ -115,6 +145,9 @@ export {
   NOTIFICATION_RECIPIENT_ROLE_VALUES,
   NOTIFICATION_RECIPIENT_PROFILE_MODELS,
   NOTIFICATION_AUDIENCE_BY_RECIPIENT_ROLE,
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_CATEGORY_VALUES,
+  NOTIFICATION_CATEGORY_PERMISSION_ACTIONS,
   NOTIFICATION_RELATED_MODELS,
   NOTIFICATION_FANOUT_TARGETS,
   NOTIFICATION_FANOUT_VALUES,

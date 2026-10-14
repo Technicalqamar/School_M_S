@@ -1,14 +1,14 @@
 import express from 'express';
 import { getOutstandingDues } from '../controllers/feeOutstanding.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('fee-management', 'outstanding-dues'),
   getOutstandingDues,
 );
 

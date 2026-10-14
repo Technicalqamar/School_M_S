@@ -10,18 +10,22 @@ const DASHBOARD_ROUTES = {
   admin: '/admin',
   teacher: '/teacher/dashboard',
   student: '/student/dashboard',
-  receptionist: '/receptionist/dashboard',
+  // Receptionists now share the Admin module pages, so the landing resolver
+  // (IndexRedirect) computes their first granted module from the stored
+  // permission set. '/admin' is a safe fallback for the Dashboard grant.
+  receptionist: '/admin',
 };
 
 // Where a first-login portal account (created with an Admin-configured default
 // password) must go to replace that temporary password. Kept role-scoped like
 // DASHBOARD_ROUTES so both portals present their own branded, layout-free
 // screen and the redirect target stays explicit. Admin accounts never carry
-// `mustChangePassword`, so no admin entry is needed.
+// `mustChangePassword`, so no admin entry is needed. Receptionists have no
+// password-change flow (the Admin assigns the password at creation), so they
+// have no entry either - their flag is cleared server-side at login.
 const CHANGE_PASSWORD_ROUTES = {
   teacher: '/teacher/change-password',
   student: '/student/change-password',
-  receptionist: '/receptionist/change-password',
 };
 
 // localStorage 'user' is written with JSON.stringify at login; parse defensively

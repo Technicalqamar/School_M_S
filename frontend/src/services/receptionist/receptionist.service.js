@@ -1,7 +1,14 @@
 import api from '../../api/axios';
 
-// Admin-side receptionist account management. Every call hits an Admin-only
-// endpoint; the backend re-checks authorization and validates all input.
+// Admin-side receptionist account management for the standalone Receptionist
+// Management module. Every call hits an Admin-only endpoint; the backend
+// re-checks authorization and validates all input.
+//
+// There is deliberately no portal (self-service) object: receptionists open the
+// shared Admin pages directly. Passwords are assigned by an Admin at creation
+// and - if a receptionist forgets theirs - reset through
+// `resetReceptionistPassword` (also Admin-only). The password is never read
+// back or displayed anywhere.
 const admin = {
   createReceptionist: async (data) => {
     const response = await api.post('/receptionists', data);
@@ -34,7 +41,7 @@ const admin = {
   },
 
   resetReceptionistPassword: async (id, newPassword) => {
-    const response = await api.patch(`/receptionists/${id}/password`, { newPassword });
+    const response = await api.patch(`/receptionists/${id}/reset-password`, { newPassword });
     return response.data;
   },
 
@@ -44,49 +51,6 @@ const admin = {
   },
 };
 
-// Receptionist portal (self) endpoints. Each is independently permission-gated
-// on the server, so the UI must handle a 403 gracefully.
-const portal = {
-  getDashboard: async () => {
-    const response = await api.get('/receptionist/dashboard');
-    return response.data;
-  },
-
-  getStudents: async (params = {}) => {
-    const response = await api.get('/receptionist/students', { params });
-    return response.data;
-  },
-
-  getStudentByStudentId: async (studentId) => {
-    const response = await api.get(`/receptionist/students/${studentId}`);
-    return response.data;
-  },
-
-  getNotices: async (params = {}) => {
-    const response = await api.get('/receptionist/notices', { params });
-    return response.data;
-  },
-
-  getNoticeById: async (id) => {
-    const response = await api.get(`/receptionist/notices/${id}`);
-    return response.data;
-  },
-
-  getAttendanceByStudent: async (studentId, academicYear) => {
-    const response = await api.get('/receptionist/attendance', {
-      params: { studentId, academicYear },
-    });
-    return response.data;
-  },
-
-  getFeesByStudent: async (studentId, academicYear) => {
-    const response = await api.get('/receptionist/fees', {
-      params: { studentId, academicYear },
-    });
-    return response.data;
-  },
-};
-
-const receptionistService = { ...admin, ...portal };
+const receptionistService = { ...admin };
 
 export default receptionistService;

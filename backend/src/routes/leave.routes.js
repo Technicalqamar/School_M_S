@@ -17,11 +17,24 @@ import {
 } from '../validations/leave.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
-// All leave management endpoints are admin-only, consistent with the existing
-// attendance authorization conventions.
+// Leave management is part of the Receptionist `attendance-management` module.
+// Every operation is gated by its own action so viewing a request never grants
+// creating, editing, deleting, approving or rejecting one:
+//   GET  /           -> leave-view
+//   GET  /:id        -> leave-view
+//   POST /           -> leave-create
+//   PUT  /:id        -> leave-edit
+//   PATCH /:id/approve -> leave-approve
+//   PATCH /:id/reject  -> leave-reject
+//   DELETE /:id      -> leave-delete
+//
+// The `/check` helper stays Admin-only: it was never called by the portal or
+// receptionist UIs (attendance marking consumes the leave service in-process)
+// and it probes anyone's approved-leave state for a date.
 router.get(
   '/check',
   protect,
@@ -33,14 +46,14 @@ router.get(
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-view'),
   getAllLeaves,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-view'),
   validateLeaveId,
   getLeaveById,
 );
@@ -48,7 +61,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-create'),
   validateCreateLeave,
   createLeave,
 );
@@ -56,7 +69,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-edit'),
   validateLeaveId,
   validateUpdateLeave,
   updateLeave,
@@ -65,7 +78,7 @@ router.put(
 router.patch(
   '/:id/approve',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-approve'),
   validateLeaveId,
   approveLeave,
 );
@@ -73,7 +86,7 @@ router.patch(
 router.patch(
   '/:id/reject',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-reject'),
   validateLeaveId,
   rejectLeave,
 );
@@ -81,7 +94,7 @@ router.patch(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'leave-delete'),
   validateLeaveId,
   deleteLeave,
 );

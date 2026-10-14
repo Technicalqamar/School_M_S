@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import CardSection from '../../common/CardSection/CardSection';
 import SelectInput from '../../common/SelectInput/SelectInput';
 import Input from '../../common/Input/Input';
@@ -21,8 +23,14 @@ const getInitialForm = (editData, configYear) => editData ? {
 
 const AddClass = ({ editData, onSuccess }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const statusOptions = [t('active'), t('inactive')];
   const { academic } = useSchoolConfig();
+  // The shared form both creates (POST, needs class-create) and edits a class
+  // (PUT, needs class-edit). The Save action is hidden unless the matching
+  // operation is granted.
+  const canClass = (actionKey) => hasReceptionistActionAccess(user, 'class-management', actionKey);
+  const canSubmit = editData ? canClass('class-edit') : canClass('class-create');
   const [form, setForm] = useState(() => getInitialForm(editData, academic?.currentYear));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -107,13 +115,15 @@ const AddClass = ({ editData, onSuccess }) => {
         >
           {t('cancel')}
         </button>
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? t('saving') : editData ? t('update') : t('save')}
-        </button>
+        {canSubmit && (
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? t('saving') : editData ? t('update') : t('save')}
+          </button>
+        )}
       </div>
     </div>
   );

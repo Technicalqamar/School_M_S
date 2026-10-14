@@ -9,6 +9,8 @@ import SearchInput from '../../common/SearchInput/SearchInput';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
 import eventsService from '../../../services/events/events.service';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -25,6 +27,8 @@ const getStatusStyle = (status) => {
 const AllEvents = ({ onDataChange, onEditEvent }) => {
   const { t } = useTranslation();
   const { academic } = useSchoolConfig();
+  const { user } = useAuth();
+  const canEvent = (actionKey) => hasReceptionistActionAccess(user, 'events-and-holidays', actionKey);
   const [events, setEvents] = useState([]);
   const [search, setSearch] = useState('');
   const [academicYear, setAcademicYear] = useState(academic.currentYear);
@@ -242,12 +246,16 @@ const AllEvents = ({ onDataChange, onEditEvent }) => {
                       <button onClick={() => setViewEvent(event)} className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer" title={t('view')}>
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button onClick={() => onEditEvent(event)} className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer" title={t('edit')}>
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => setDeleteTarget(event)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      {canEvent('event-edit') && (
+                        <button onClick={() => onEditEvent(event)} className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer" title={t('edit')}>
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canEvent('event-delete') && (
+                        <button onClick={() => setDeleteTarget(event)} className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer" title={t('delete')}>
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

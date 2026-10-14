@@ -83,7 +83,7 @@ const ReceptionistLogin = () => {
     <AuthLayout
       role="receptionist"
       title="Receptionist Sign In"
-      subtitle="Enter your credentials to access the receptionist portal"
+      subtitle="Sign in with the login ID and password assigned to you by an Administrator"
     >
       <Alert message={error} type="error" />
 
@@ -95,7 +95,7 @@ const ReceptionistLogin = () => {
           required
           value={formData.receptionistId}
           onChange={handleChange}
-          placeholder="REC-000001"
+          placeholder="Your login ID"
           icon={IdentificationIcon}
           error={fieldErrors.receptionistId}
         />

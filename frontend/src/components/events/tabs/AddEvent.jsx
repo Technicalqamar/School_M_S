@@ -8,6 +8,8 @@ import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal'
 import Button from '../../common/Button/Button';
 import eventsService from '../../../services/events/events.service';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 
 const initialForm = {
   name: '',
@@ -27,6 +29,11 @@ const initialForm = {
 const AddEvent = ({ onDataChange, editEvent, onClearEdit }) => {
   const { t } = useTranslation();
   const { academic } = useSchoolConfig();
+  const { user } = useAuth();
+  // The shared form creates (event-create) or edits (event-edit) an event; the
+  // Save action is hidden unless the matching operation is granted.
+  const canEvent = (actionKey) => hasReceptionistActionAccess(user, 'events-and-holidays', actionKey);
+  const canSubmit = editEvent ? canEvent('event-edit') : canEvent('event-create');
   const [form, setForm] = useState({ ...initialForm, academicYear: academic.currentYear || '' });
   const [imagePreview, setImagePreview] = useState(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -286,9 +293,11 @@ const AddEvent = ({ onDataChange, editEvent, onClearEdit }) => {
 
       {/* Buttons */}
       <div className="lg:col-span-3 flex flex-wrap gap-3">
-        <Button onClick={handleSave} loading={saving} variant="primary" className="!w-auto px-6">
-          {isEditing ? t('updateEvent') : t('saveEvent')}
-        </Button>
+        {canSubmit && (
+          <Button onClick={handleSave} loading={saving} variant="primary" className="!w-auto px-6">
+            {isEditing ? t('updateEvent') : t('saveEvent')}
+          </Button>
+        )}
         <button onClick={handleReset}
           className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-2 cursor-pointer">
           <ArrowPathIcon className="h-4 w-4" /> {isEditing ? t('cancelEdit') : t('reset')}

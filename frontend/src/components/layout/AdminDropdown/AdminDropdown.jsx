@@ -14,8 +14,12 @@ const AdminDropdown = () => {
   const [profile, setProfile] = useState(null);
   const { t } = useTranslation();
   const dropdownRef = useRef(null);
-  const { logout } = useAuth();
+  const { user, role, logout } = useAuth();
+  const isReceptionist = role === 'receptionist';
 
+  // Backend GET /profile is Admin-only and rejects receptionist sessions, so we
+  // only call it for Admin users. Receptionists are identified from the
+  // authenticated session (AuthContext) instead.
   const fetchProfile = async () => {
     try {
       const data = await authService.getProfile();
@@ -36,9 +40,10 @@ const AdminDropdown = () => {
   }, []);
 
   useEffect(() => {
+    if (isReceptionist) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProfile();
-  }, []);
+  }, [isReceptionist]);
 
   const handleProfileUpdated = () => {
     fetchProfile();
@@ -53,9 +58,10 @@ const AdminDropdown = () => {
     await logout();
   };
 
-  const profileImageUrl = getImageUrl(profile?.profileImage);
-  const initials = profile?.fullName
-    ? profile.fullName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+  const displayProfile = isReceptionist ? user : profile;
+  const profileImageUrl = getImageUrl(displayProfile?.profileImage);
+  const initials = displayProfile?.fullName
+    ? displayProfile.fullName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'A';
 
   return (
@@ -72,26 +78,30 @@ const AdminDropdown = () => {
           )}
         </div>
         <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[100px] truncate">
-          {profile?.fullName || 'Admin'}
+          {displayProfile?.fullName || (isReceptionist ? 'Receptionist' : 'Admin')}
         </span>
         <ChevronDownIcon className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 overflow-hidden">
-          <button
-            className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            onClick={() => { setProfileOpen(true); setIsOpen(false); }}
-          >
-            <UserCircleIcon className="mr-2.5 h-4 w-4" /> {t('profile')}
-          </button>
-          <button
-            className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            onClick={() => { setAccountSettingsOpen(true); setIsOpen(false); }}
-          >
-            <Cog6ToothIcon className="mr-2.5 h-4 w-4" /> {t('accountSettings')}
-          </button>
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+          {!isReceptionist && (
+            <>
+              <button
+                className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                onClick={() => { setProfileOpen(true); setIsOpen(false); }}
+              >
+                <UserCircleIcon className="mr-2.5 h-4 w-4" /> {t('profile')}
+              </button>
+              <button
+                className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                onClick={() => { setAccountSettingsOpen(true); setIsOpen(false); }}
+              >
+                <Cog6ToothIcon className="mr-2.5 h-4 w-4" /> {t('accountSettings')}
+              </button>
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            </>
+          )}
           <button
             className="flex items-center w-full px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             onClick={handleLogout}
@@ -100,8 +110,12 @@ const AdminDropdown = () => {
           </button>
         </div>
       )}
-      <ProfileModal key={profileOpen} isOpen={profileOpen} onClose={() => setProfileOpen(false)} onProfileUpdated={handleProfileUpdated} />
-      <AccountSettingsModal isOpen={accountSettingsOpen} onClose={() => setAccountSettingsOpen(false)} />
+      {!isReceptionist && (
+        <>
+          <ProfileModal key={profileOpen} isOpen={profileOpen} onClose={() => setProfileOpen(false)} onProfileUpdated={handleProfileUpdated} />
+          <AccountSettingsModal isOpen={accountSettingsOpen} onClose={() => setAccountSettingsOpen(false)} />
+        </>
+      )}
     </div>
   );
 };

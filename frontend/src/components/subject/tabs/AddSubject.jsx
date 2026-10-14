@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import CardSection from '../../common/CardSection/CardSection';
 import Input from '../../common/Input/Input';
 import SelectInput from '../../common/SelectInput/SelectInput';
@@ -23,6 +25,12 @@ const getInitialForm = (editData) => editData ? {
 
 const AddSubject = ({ editData, onSuccess }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  // The shared form both creates (needs subject-create) and edits a subject
+  // (needs subject-edit). Save is hidden unless the matching operation is
+  // granted.
+  const canSubject = (actionKey) => hasReceptionistActionAccess(user, 'subject-management', actionKey);
+  const canSubmit = editData ? canSubject('subject-edit') : canSubject('subject-create');
   const statusOptions = [t('active'), t('inactive')];
   const [form, setForm] = useState(() => getInitialForm(editData));
   const [loading, setLoading] = useState(false);
@@ -134,13 +142,15 @@ const AddSubject = ({ editData, onSuccess }) => {
         >
           {t('cancel')}
         </button>
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? t('saving') : editData ? t('update') : t('save')}
-        </button>
+        {canSubmit && (
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? t('saving') : editData ? t('update') : t('save')}
+          </button>
+        )}
       </div>
     </div>
   );

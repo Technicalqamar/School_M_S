@@ -12,12 +12,11 @@ const getDefaultPasswords = asyncHandler(async (req, res) => {
 });
 
 const updateDefaultPasswords = asyncHandler(async (req, res) => {
-  const { student, teacher, receptionist } = req.body || {};
+  const { student, teacher } = req.body || {};
 
   const data = await defaultPasswordService.updateDefaultPasswords({
     student,
     teacher,
-    receptionist,
     performedBy: req.user?._id,
   });
 

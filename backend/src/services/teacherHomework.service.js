@@ -13,6 +13,8 @@ import notificationEngine from './notificationEngine.service.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_RECIPIENT_ROLES,
+  NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 
 const VALID_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue'];
@@ -210,6 +212,19 @@ const notifyClassStudentsAboutAssignment = async (assignment) => {
       }),
     ),
   );
+
+  // One "General" copy for receptionists granted the "other" bell category -
+  // unlike the per-student copies above, this is a single fan-out and is skipped
+  // entirely when no receptionist holds the permission.
+  await notificationEngine.notify({
+    type: NOTIFICATION_TYPES.HOMEWORK_CREATED,
+    title: `New homework: ${assignment.title}`,
+    message: `${byTeacher} assigned "${assignment.title}"${assignment.subjectName ? ` for ${assignment.subjectName}` : ''} in ${className}.${dueDate ? ` Due on ${dueDate}.` : ''}`,
+    fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+    category: NOTIFICATION_CATEGORIES.GENERAL,
+    academicYear,
+    relatedEntity: { model: 'Assignment', id: assignment.id, label: assignment.title },
+  });
 };
 
 const createAssignment = async (user, payload) => {

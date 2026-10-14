@@ -14,6 +14,8 @@ import EditTeacherModal from '../../common/EditTeacherModal/EditTeacherModal';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import teacherService from '../../../services/teacher/teacher.service';
 
 const ITEMS_PER_PAGE = 10;
@@ -35,6 +37,8 @@ const isCurrentMonth = (d) => {
 
 const AllTeachers = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const canTeacher = (actionKey) => hasReceptionistActionAccess(user, 'teacher-management', actionKey);
   const statusOptions = [t('all'), t('active'), t('inactive')];
   const [view, setView] = useState('table');
   const [search, setSearch] = useState('');
@@ -143,9 +147,9 @@ const AllTeachers = () => {
         </td>
         <td className="px-4 py-3 text-right">
           <ActionButtons
-            onView={() => setSelectedTeacher(teacher)}
-            onEdit={() => setEditingTeacher(teacher)}
-            onDelete={() => setDeletingTeacher(teacher)}
+            onView={canTeacher('teacher-view') ? () => setSelectedTeacher(teacher) : undefined}
+            onEdit={canTeacher('teacher-edit') ? () => setEditingTeacher(teacher) : undefined}
+            onDelete={canTeacher('teacher-delete') ? () => setDeletingTeacher(teacher) : undefined}
           />
         </td>
       </>
@@ -261,9 +265,9 @@ const AllTeachers = () => {
                   <TeacherCard
                     key={teacher.teacherId}
                     teacher={teacher}
-                    onView={() => setSelectedTeacher(teacher)}
-                    onEdit={() => setEditingTeacher(teacher)}
-                    onDelete={() => setDeletingTeacher(teacher)}
+                    onView={canTeacher('teacher-view') ? () => setSelectedTeacher(teacher) : undefined}
+                    onEdit={canTeacher('teacher-edit') ? () => setEditingTeacher(teacher) : undefined}
+                    onDelete={canTeacher('teacher-delete') ? () => setDeletingTeacher(teacher) : undefined}
                   />
                 ))}
               </div>

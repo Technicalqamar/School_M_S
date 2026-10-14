@@ -18,20 +18,20 @@ import {
   validateDeleteSelectedNotifications,
 } from '../validations/notification.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 // Literal sub-paths must be declared before the /:id handlers.
-router.get('/unread-count', protect, authorize('admin'), getUnreadCount);
-router.put('/read-all', protect, authorize('admin'), markAllNotificationsRead);
-router.post('/delete-selected', protect, authorize('admin'), validateDeleteSelectedNotifications, deleteSelectedNotifications);
+router.get('/unread-count', protect, requireActionAccess('communication', 'notifications-view'), getUnreadCount);
+router.put('/read-all', protect, requireActionAccess('communication', 'notifications-view'), markAllNotificationsRead);
+router.post('/delete-selected', protect, requireActionAccess('communication', 'notifications-delete'), validateDeleteSelectedNotifications, deleteSelectedNotifications);
 
-router.get('/', protect, authorize('admin'), validateListNotifications, getNotifications);
-router.post('/', protect, authorize('admin'), validateCreateNotification, createNotification);
-router.get('/:id', protect, authorize('admin'), validateNotificationId, getNotificationById);
-router.put('/:id/read', protect, authorize('admin'), validateNotificationId, markNotificationRead);
-router.put('/:id', protect, authorize('admin'), validateUpdateNotification, updateNotification);
-router.delete('/:id', protect, authorize('admin'), validateNotificationId, deleteNotification);
+router.get('/', protect, requireActionAccess('communication', 'notifications-view'), validateListNotifications, getNotifications);
+router.post('/', protect, requireActionAccess('communication', 'notifications-create'), validateCreateNotification, createNotification);
+router.get('/:id', protect, requireActionAccess('communication', 'notifications-view'), validateNotificationId, getNotificationById);
+router.put('/:id/read', protect, requireActionAccess('communication', 'notifications-view'), validateNotificationId, markNotificationRead);
+router.put('/:id', protect, requireActionAccess('communication', 'notifications-edit'), validateUpdateNotification, updateNotification);
+router.delete('/:id', protect, requireActionAccess('communication', 'notifications-delete'), validateNotificationId, deleteNotification);
 
 export default router;

@@ -16,14 +16,14 @@ import {
   validateQrScan,
 } from '../validations/teacherAttendance.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.post(
   '/qr-scan',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-mark'),
   validateQrScan,
   qrScanTeacherAttendance,
 );
@@ -31,28 +31,28 @@ router.post(
 router.get(
   '/teachers',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-view'),
   getTeachersWithAttendance,
 );
 
 router.get(
   '/history',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'attendance-history-view'),
   getAttendanceHistory,
 );
 
 router.get(
   '/reports',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'attendance-history-view'),
   getAttendanceReports,
 );
 
 router.get(
   '/by-date',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-view'),
   validateGetAttendance,
   getAttendanceByDate,
 );
@@ -60,21 +60,21 @@ router.get(
 router.get(
   '/teacher/:teacherId',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-view'),
   getAttendanceByTeacher,
 );
 
 router.patch(
   '/check-in',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-mark'),
   resetCheckIn,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-mark'),
   validateSaveAttendance,
   saveAttendance,
 );
@@ -82,7 +82,7 @@ router.post(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('attendance-management', 'teacher-attendance-mark'),
   deleteAttendance,
 );
 

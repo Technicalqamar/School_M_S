@@ -2,35 +2,35 @@ import express from 'express';
 import { createExam, getAllExams, getExamById, updateExam, deleteExam } from '../controllers/exam.controller.js';
 import { validateCreateExam, validateUpdateExam } from '../validations/exam.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('exam-management', 'exam-setup'),
   getAllExams,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('exam-management', 'exam-setup'),
   getExamById,
 );
 
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('exam-management', 'exam-setup'),
   deleteExam,
 );
 
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('exam-management', 'exam-setup'),
   validateUpdateExam,
   updateExam,
 );
@@ -38,7 +38,7 @@ router.put(
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('exam-management', 'exam-setup'),
   validateCreateExam,
   createExam,
 );

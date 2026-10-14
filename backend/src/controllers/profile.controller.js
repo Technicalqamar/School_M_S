@@ -330,7 +330,19 @@ export const changePassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'New password must be at least 6 characters');
   }
 
-  if (isTeacherUser(req) || isStudentUser(req) || isReceptionistUser(req)) {
+  // Receptionists have no password-change flow: the Admin assigns the password
+  // once at account creation and no change/reset path exists for this role.
+  // Blocking here (in addition to hiding the UI/menu items) makes it impossible
+  // for a receptionist - or anyone holding a receptionist session - to rotate
+  // their own credentials, and the backend password endpoint stays Admin-only.
+  if (isReceptionistUser(req)) {
+    throw new ApiError(
+      403,
+      'Receptionist accounts cannot change their own password. Contact an Administrator for account help.',
+    );
+  }
+
+  if (isTeacherUser(req) || isStudentUser(req)) {
     let account;
     if (isPortalAccount(req)) {
       account = await UserAccount.findById(req.user._id).select('+password');

@@ -9,6 +9,7 @@ import notificationEngine from './notificationEngine.service.js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
+  NOTIFICATION_CATEGORIES,
 } from '../constants/notification.constants.js';
 import userAccountService from './userAccount.service.js';
 import defaultPasswordService from './defaultPassword.service.js';
@@ -121,6 +122,17 @@ const createStudent = async (data, file, baseUrl = '', performedBy = null) => {
       title: 'New student admitted',
       message: `${student.fullName} (${student.studentId}) was admitted to ${student.class} for ${student.academicYear}. Admission No: ${student.admissionNumber}.`,
       fanout: NOTIFICATION_FANOUT_TARGETS.ALL_ADMINS,
+      academicYear: student.academicYear,
+      relatedEntity: { model: 'Student', id: student._id, label: student.studentId },
+    });
+
+    // Same event fan-out to receptionists granted the "other" bell category.
+    await notificationEngine.notify({
+      type: NOTIFICATION_TYPES.STUDENT_CREATED,
+      title: 'New student admitted',
+      message: `${student.fullName} (${student.studentId}) was admitted to ${student.class} for ${student.academicYear}. Admission No: ${student.admissionNumber}.`,
+      fanout: NOTIFICATION_FANOUT_TARGETS.RECEPTIONISTS,
+      category: NOTIFICATION_CATEGORIES.GENERAL,
       academicYear: student.academicYear,
       relatedEntity: { model: 'Student', id: student._id, label: student.studentId },
     });

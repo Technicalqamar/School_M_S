@@ -8,21 +8,21 @@ import {
 } from '../controllers/timeSlot.controller.js';
 import { validateCreateTimeSlot, validateUpdateTimeSlot, validateTimeSlotId } from '../validations/timeSlot.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireModuleAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'time-slots'),
   getAllTimeSlots,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'time-slots'),
   validateTimeSlotId,
   getTimeSlotById,
 );
@@ -30,7 +30,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'time-slots'),
   validateCreateTimeSlot,
   createTimeSlot,
 );
@@ -38,7 +38,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'time-slots'),
   validateUpdateTimeSlot,
   updateTimeSlot,
 );
@@ -46,7 +46,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireModuleAccess('timetable-management', 'time-slots'),
   validateTimeSlotId,
   deleteTimeSlot,
 );

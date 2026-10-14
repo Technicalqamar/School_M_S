@@ -16,6 +16,8 @@ import SearchInput from "../../common/SearchInput/SearchInput";
 import ConfirmationModal from "../../common/ConfirmationModal/ConfirmationModal";
 import eventsService from "../../../services/events/events.service";
 import { useSchoolConfig } from "../../../contexts/SchoolConfigContext";
+import { useAuth } from "../../../contexts/AuthContext";
+import { hasReceptionistActionAccess } from "../../../constants/receptionistPermissions";
 
 const COLORS = [
   "#3b82f6",
@@ -31,6 +33,10 @@ const COLORS = [
 const EventGallery = ({ onDataChange }) => {
   const { t } = useTranslation();
   const { academic } = useSchoolConfig();
+  const { user } = useAuth();
+  // Uploading/replacing/removing gallery images is `event-gallery-create`.
+  // Viewing the galleries only needs `event-gallery-view`.
+  const canManageGallery = hasReceptionistActionAccess(user, 'events-and-holidays', 'event-gallery-create');
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [academicYear, setAcademicYear] = useState(academic.currentYear);
@@ -439,16 +445,18 @@ const EventGallery = ({ onDataChange }) => {
                     </span>
                   </div>
                   {/* Manage Gallery Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openManageGallery(item);
-                    }}
-                    className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer"
-                  >
-                    <PhotoIcon className="h-3.5 w-3.5" />
-                    {t("manageGallery")}
-                  </button>
+                  {canManageGallery && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openManageGallery(item);
+                      }}
+                      className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                    >
+                      <PhotoIcon className="h-3.5 w-3.5" />
+                      {t("manageGallery")}
+                    </button>
+                  )}
                 </div>
               </div>
             );

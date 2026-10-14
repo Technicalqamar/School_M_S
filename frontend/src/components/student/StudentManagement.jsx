@@ -1,5 +1,7 @@
 import { useState, Component } from 'react';
 import { useTranslation } from '../../hooks/useLocalization';
+import { useAuth } from '../../contexts/AuthContext';
+import { filterTabsByPermission } from '../../constants/receptionistPermissions';
 import AllStudents from './tabs/AllStudents';
 import AddStudent from './tabs/AddStudent';
 import StudentPromotionTab from './tabs/StudentPromotion';
@@ -48,14 +50,22 @@ const TabWrapper = ({ tab, onSuccess }) => {
 
 const StudentManagement = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('All Students');
 
-  const tabs = [
+  const allTabs = [
     { key: 'All Students', label: t('allStudents') },
     { key: 'Add Student', label: t('addStudent') },
     { key: 'Student Promotion', label: t('studentPromotion') },
     { key: 'Promotion History', label: t('promotionHistory') },
   ];
+
+  // Receptionists only see the tabs their stored permissions open; the module
+  // route may be reached with any grant (e.g. add-only), so the active tab is
+  // clamped to the first visible one. Admins see every tab.
+  const tabs = filterTabsByPermission(user, 'student-management', allTabs);
+  if (tabs.length === 0) return null;
+  const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : tabs[0].key;
 
   return (
     <div className="space-y-6">
@@ -66,7 +76,7 @@ const StudentManagement = () => {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === tab.key
+                currentTab === tab.key
                   ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
@@ -77,8 +87,8 @@ const StudentManagement = () => {
         </nav>
       </div>
 
-      <TabErrorBoundary key={activeTab}>
-        <TabWrapper tab={activeTab} onSuccess={() => setActiveTab('All Students')} />
+      <TabErrorBoundary key={currentTab}>
+        <TabWrapper tab={currentTab} onSuccess={() => setActiveTab('All Students')} />
       </TabErrorBoundary>
     </div>
   );

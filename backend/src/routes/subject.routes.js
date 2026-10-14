@@ -11,21 +11,21 @@ import {
 } from '../controllers/subject.controller.js';
 import { validateCreateSubject, validateUpdateSubject, validateAssignSubjectsToClass } from '../validations/subject.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
-import { authorize } from '../middlewares/role.middleware.js';
+import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
 const router = express.Router();
 
 router.get(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-view'),
   getAllSubjects,
 );
 
 router.post(
   '/assign-class',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-assign'),
   validateAssignSubjectsToClass,
   assignSubjectsToClass,
 );
@@ -33,28 +33,28 @@ router.post(
 router.get(
   '/assign-class',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-view'),
   getClassAssignments,
 );
 
 router.get(
   '/assign-class/years',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-view'),
   getClassAssignmentYears,
 );
 
 router.get(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-view'),
   getSubjectById,
 );
 
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-create'),
   validateCreateSubject,
   createSubject,
 );
@@ -62,7 +62,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-edit'),
   validateUpdateSubject,
   updateSubject,
 );
@@ -70,7 +70,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin'),
+  requireActionAccess('subject-management', 'subject-delete'),
   deleteSubject,
 );
 

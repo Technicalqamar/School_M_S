@@ -13,6 +13,8 @@ import { CLASS_NAMES } from '../../../utils/classNames';
 import { VerticalTemplate, HorizontalTemplate } from '../templates';
 import { getInitials } from '../templates/shared/cardHtmlUtils';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
 import { getImageUrl } from '../../../utils/imageUrl';
 import Spinner from '../../common/Spinner/Spinner';
 import qrManagementService from '../../../services/qrManagement/qrManagement.service';
@@ -29,7 +31,11 @@ const PaintSvg = () => <svg className="w-4 h-4" fill="none" stroke="currentColor
 
 const IDCardManagement = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { schoolInfo, academic } = useSchoolConfig();
+  // Generating, re-issuing and printing cards are `id-card-generate` operations
+  // on the backend. Viewing stays available with `id-card-view` only.
+  const canGenerate = hasReceptionistActionAccess(user, 'attendance-management', 'id-card-generate');
   const SCHOOL_INFO = {
     name: schoolInfo.name,
     address: schoolInfo.address || schoolInfo.schoolAddress || 'N/A',
@@ -580,38 +586,46 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
             <UserGroupIcon className="h-4 w-4" />
             {cardType === 'Teacher' ? 'Load Teachers' : t('loadStudents')}
           </button>
-          <button
-            onClick={handleGenerateMissingCards}
-            disabled={currentRecordsCount === 0 || actionBusy}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-          >
-            <CheckCircleIcon className="h-4 w-4" />
-            {cardType === 'Teacher' ? 'Generate Teacher Cards' : t('generateMissingCards')}
-          </button>
-          <button
-            onClick={() => handlePrintCards(selectedIds.size ? filtered.filter((s) => selectedIds.has(s.id)) : [])}
-            disabled={filtered.length === 0}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-          >
-            <PrinterIcon className="h-4 w-4" />
-            {t('printSelected')}
-          </button>
-          <button
-            onClick={handlePrintAll}
-            disabled={filtered.length === 0}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-          >
-            <PrinterIcon className="h-4 w-4" />
-            {t('printAll')}
-          </button>
-          <button
-            onClick={handleMarkAsPrinted}
-            disabled={selectedIds.size === 0 || actionBusy}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
-          >
-            <DocumentCheckIcon className="h-4 w-4" />
-            {t('markAsPrinted')}
-          </button>
+          {canGenerate && (
+            <button
+              onClick={handleGenerateMissingCards}
+              disabled={currentRecordsCount === 0 || actionBusy}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              {cardType === 'Teacher' ? 'Generate Teacher Cards' : t('generateMissingCards')}
+            </button>
+          )}
+          {canGenerate && (
+            <button
+              onClick={() => handlePrintCards(selectedIds.size ? filtered.filter((s) => selectedIds.has(s.id)) : [])}
+              disabled={filtered.length === 0}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              {t('printSelected')}
+            </button>
+          )}
+          {canGenerate && (
+            <button
+              onClick={handlePrintAll}
+              disabled={filtered.length === 0}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              {t('printAll')}
+            </button>
+          )}
+          {canGenerate && (
+            <button
+              onClick={handleMarkAsPrinted}
+              disabled={selectedIds.size === 0 || actionBusy}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+            >
+              <DocumentCheckIcon className="h-4 w-4" />
+              {t('markAsPrinted')}
+            </button>
+          )}
 
         </div>
       </div>
@@ -695,31 +709,37 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleRegenerateCard(student.id)}
-                          className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer"
-                          title={t('reissueCard')}
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="5" width="20" height="14" rx="2" />
-                            <line x1="2" y1="10" x2="22" y2="10" />
-                            <line x1="7" y1="15" x2="13" y2="15" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleSinglePrint(student)}
-                          className="p-1.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
-                          title={t('printCard')}
-                        >
-                          <PrinterIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleSinglePdf(student)}
-                          className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
-                          title={t('downloadPdf')}
-                        >
-                          <DocumentArrowDownIcon className="h-4 w-4" />
-                        </button>
+                        {canGenerate && (
+                          <button
+                            onClick={() => handleRegenerateCard(student.id)}
+                            className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors cursor-pointer"
+                            title={t('reissueCard')}
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="5" width="20" height="14" rx="2" />
+                              <line x1="2" y1="10" x2="22" y2="10" />
+                              <line x1="7" y1="15" x2="13" y2="15" />
+                            </svg>
+                          </button>
+                        )}
+                        {canGenerate && (
+                          <button
+                            onClick={() => handleSinglePrint(student)}
+                            className="p-1.5 rounded-lg text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                            title={t('printCard')}
+                          >
+                            <PrinterIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                        {canGenerate && (
+                          <button
+                            onClick={() => handleSinglePdf(student)}
+                            className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                            title={t('downloadPdf')}
+                          >
+                            <DocumentArrowDownIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
