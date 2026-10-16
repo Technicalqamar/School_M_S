@@ -102,6 +102,18 @@ const qrManagementService = {
     const response = await api.patch('/id-cards/mark-printed', { studentIds });
     return response.data?.data || response.data;
   },
+
+  /**
+   * Persists the designer layout for a single student card
+   * (PUT /id-cards/:studentId/design -> IdCardManagement.frontDesign/backDesign).
+   * The designer edits one layout for the whole working set, so callers fan this
+   * out over the students the layout applies to. `data` is built by
+   * `buildDesignPayload` ({ template, frontDesign, backDesign }).
+   */
+  async updateCardDesign(studentId, data = {}) {
+    const response = await api.put(`/id-cards/${studentId}/design`, data);
+    return response.data?.data || response.data;
+  },
 };
 
 export default qrManagementService;

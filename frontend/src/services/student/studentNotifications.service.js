@@ -32,6 +32,7 @@ export const NOTIFICATION_TYPE_LABEL_KEYS = {
   MARKS_SUBMITTED: 'notificationTypeMarks',
   STUDENT_CREATED: 'notificationTypeStudentCreated',
   FEE_COLLECTED: 'notificationTypeFeeCollected',
+  FEE_REMINDER: 'notificationTypeFeeReminder',
   SALARY_PAYMENT_RECORDED: 'notificationTypeSalary',
 };
 
@@ -45,6 +46,7 @@ export const NOTIFICATION_TYPE_STYLES = {
   MARKS_SUBMITTED: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
   STUDENT_CREATED: 'bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
   FEE_COLLECTED: 'bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
+  FEE_REMINDER: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
   SALARY_PAYMENT_RECORDED: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
 };
 
@@ -87,6 +89,9 @@ const getNotifications = async (params = {}) => {
   if (params.page) query.page = params.page;
   if (params.limit) query.limit = params.limit;
   if (params.unreadOnly) query.unreadOnly = 'true';
+  if (Array.isArray(params.types) && params.types.length) {
+    query.types = params.types.join(',');
+  }
 
   const response = await api.get('/student/notifications', { params: query });
   const data = response.data?.data || {};
@@ -97,8 +102,12 @@ const getNotifications = async (params = {}) => {
   };
 };
 
-const getUnreadCount = async () => {
-  const response = await api.get('/student/notifications/unread-count');
+const getUnreadCount = async (params = {}) => {
+  const query = {};
+  if (Array.isArray(params.types) && params.types.length) {
+    query.types = params.types.join(',');
+  }
+  const response = await api.get('/student/notifications/unread-count', { params: query });
   return response.data?.data?.count ?? 0;
 };
 
@@ -108,8 +117,12 @@ const markAsRead = async (id) => {
   return normalizeNotification(response.data?.data?.notification);
 };
 
-const markAllRead = async () => {
-  const response = await api.put('/student/notifications/read-all');
+const markAllRead = async (params = {}) => {
+  const query = {};
+  if (Array.isArray(params.types) && params.types.length) {
+    query.types = params.types.join(',');
+  }
+  const response = await api.put('/student/notifications/read-all', null, { params: query });
   emitChange();
   return response.data?.data?.updatedCount ?? 0;
 };

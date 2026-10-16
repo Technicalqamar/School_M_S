@@ -11,7 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RequireModule from './components/RequireModule';
 import RequireAdmin from './components/RequireAdmin';
 import { ADMIN_MODULES } from './constants/adminModules';
-import { findFirstAccessibleModulePath } from './constants/receptionistPermissions';
+import { findFirstAccessibleModulePath, getPortalBasePath } from './constants/receptionistPermissions';
 
 import AdminLoginPage from './pages/auth/AdminAuth/AdminLogin';
 import AdminForgotPasswordPage from './pages/auth/AdminAuth/ForgotPassword';
@@ -39,6 +39,7 @@ import StudentClassSchedule from './pages/student/StudentClassSchedule';
 import StudentAttendance from './pages/student/StudentAttendance';
 import StudentExamination from './pages/student/StudentExamination';
 import StudentNotifications from './pages/student/StudentNotifications';
+import StudentFeeReminders from './pages/student/StudentFeeReminders';
 import StudentNotices from './pages/student/StudentNotices';
 import PortalAccess from './pages/portal/PortalAccess';
 import PortalDashboard from './pages/portal/PortalDashboard';
@@ -48,6 +49,17 @@ import StudentLayout from './layouts/StudentLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import StudentManagement from './pages/admin/StudentManagement';
 import StudentProfilePage from './pages/admin/StudentProfile';
+import StudentAttendanceHistoryPage from './components/student/SingleStudent/StudentAttendanceHistory';
+import StudentIdCardPage from './components/student/SingleStudent/StudentIdCard';
+import {
+  StudentOverviewPage,
+  StudentAcademicPage,
+  StudentFeesPage,
+  StudentDocumentsPage,
+  StudentOtherPage,
+  StudentExamRecordsPage,
+  StudentAdmitCardPage,
+} from './components/student/SingleStudent/SingleStudentPages';
 import TeacherManagement from './pages/admin/TeacherManagement';
 import ClassManagement from './pages/admin/ClassManagement';
 import SubjectManagement from './pages/admin/SubjectManagement';
@@ -60,6 +72,7 @@ import CollectFeePage from './pages/admin/FeeManagement/CollectFee';
 import StudentFeeDetailsPage from './pages/admin/FeeManagement/StudentFeeDetails';
 import FeeReportsPage from './pages/admin/FeeManagement/Reports';
 import OutstandingDuesPage from './pages/admin/FeeManagement/OutstandingDues';
+import FeeRemindersPage from './pages/admin/FeeManagement/FeeReminders';
 import FeeVoucherGenerationPage from './pages/admin/FeeManagement/FeeVoucherGeneration';
 import SmsPage from './pages/admin/Communication/Sms';
 import NoticesPage from './pages/admin/Communication/Notices';
@@ -92,11 +105,12 @@ function IndexRedirect() {
     if (user.mustChangePassword === true && CHANGE_PASSWORD_ROUTES[role]) {
       return <Navigate to={CHANGE_PASSWORD_ROUTES[role]} replace />;
     }
-    // Receptionists share the Admin pages. They land on their first granted
-    // module (or an honest "access denied" screen when nothing is granted).
+    // Receptionists share the Admin pages, but under the `/receptionist`
+    // namespace. They land on their first granted module (or an honest
+    // "access denied" screen when nothing is granted).
     if (role === 'receptionist') {
       const landing = findFirstAccessibleModulePath(user);
-      return <Navigate to={landing || '/admin/access-denied'} replace />;
+      return <Navigate to={landing || '/receptionist/access-denied'} replace />;
     }
     return <Navigate to={DASHBOARD_ROUTES[role] || '/admin/login'} replace />;
   }
@@ -110,64 +124,22 @@ function IndexRedirect() {
 
 function SmsRouteGuard({ children }) {
   const { loading: configLoading, preferences } = useSchoolConfig();
+  const { role } = useAuth();
 
   // Wait for the real saved setting before deciding where to send the user.
   if (configLoading) return <FullPageLoader />;
 
   if (!preferences?.smsModuleEnabled) {
-    return <Navigate to="/admin/communication/notices" replace />;
+    // Stay inside the signed-in portal's namespace (Admin vs Receptionist).
+    return <Navigate to={`${getPortalBasePath(role)}/communication/notices`} replace />;
   }
 
   return children;
 }
 
-function AppContent() {
-  const { loading: authLoading } = useAuth();
-  const { loaded: configLoaded, login: loginConfig } = useSchoolConfig();
-  const splashEnabled = configLoaded ? (loginConfig?.splashEnabled ?? true) : true;
-  const loaderStyle = configLoaded ? (loginConfig?.loaderStyle || '') : '';
-
-  const [splashTimerExpired, setSplashTimerExpired] = useState(false);
-
-  useEffect(() => {
-    if (authLoading || !splashEnabled) return;
-    const resetId = setTimeout(() => setSplashTimerExpired(false), 0);
-    const timerId = setTimeout(() => setSplashTimerExpired(true), 1200);
-    return () => { clearTimeout(resetId); clearTimeout(timerId); };
-  }, [authLoading, splashEnabled]);
-
-  const splashVisible = authLoading || (splashEnabled && !splashTimerExpired);
-
+function renderAdminShell(basePath) {
   return (
-    <>
-      <SplashScreen visible={splashVisible} loaderStyle={loaderStyle} />
-      <Toaster position="top-right" reverseOrder={false} />
-      <Routes>
-        <Route path="/login" element={<Navigate to="/admin/login" replace />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
-        <Route path="/admin/verify-otp" element={<AdminVerifyOTPPage />} />
-        <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
-        <Route path="/teacher/login" element={<TeacherLoginPage />} />
-        <Route path="/student/login" element={<StudentLoginPage />} />
-        <Route path="/receptionist/login" element={<ReceptionistLoginPage />} />
-
-        {/* First-login password change: authenticated, but deliberately NOT
-            wrapped in the portal layouts so no protected data request fires. */}
-        <Route element={<ProtectedRoute allowedRoles={['teacher']} allowPasswordChange />}>
-          <Route path="/teacher/change-password" element={<ChangePasswordPage />} />
-        </Route>
-        <Route element={<ProtectedRoute allowedRoles={['student']} allowPasswordChange />}>
-          <Route path="/student/change-password" element={<ChangePasswordPage />} />
-        </Route>
-
-        {/* Shared Admin shell. Admins and receptionists both live here: a
-            receptionist opens the same pages an Admin uses (no duplicate
-            portal). Every page is additionally gated by RequireModule, which
-            checks the receptionist's stored permission set before rendering.
-            The backend re-checks all of this server-side. */}
-        <Route element={<ProtectedRoute allowedRoles={['admin', 'receptionist']} />}>
-          <Route path="/admin" element={<AdminLayout />}>
+    <Route key={basePath} path={basePath} element={<AdminLayout />}>
             <Route
               index
               element={
@@ -191,7 +163,17 @@ function AppContent() {
                   <StudentProfilePage />
                 </RequireModule>
               }
-            />
+            >
+              <Route index element={<StudentOverviewPage />} />
+              <Route path="academic" element={<StudentAcademicPage />} />
+              <Route path="attendance" element={<StudentAttendanceHistoryPage />} />
+              <Route path="exams" element={<StudentExamRecordsPage />} />
+              <Route path="admit-card" element={<StudentAdmitCardPage />} />
+              <Route path="fees" element={<StudentFeesPage />} />
+              <Route path="id-card" element={<StudentIdCardPage />} />
+              <Route path="documents" element={<StudentDocumentsPage />} />
+              <Route path="other" element={<StudentOtherPage />} />
+            </Route>
             <Route
               path="teachers"
               element={
@@ -285,6 +267,14 @@ function AppContent() {
               element={
                 <RequireModule module="fee-management" page="outstanding-dues">
                   <OutstandingDuesPage />
+                </RequireModule>
+              }
+            />
+            <Route
+              path="fees/reminders"
+              element={
+                <RequireModule module="fee-management" page="reminders">
+                  <FeeRemindersPage />
                 </RequireModule>
               }
             />
@@ -422,7 +412,59 @@ function AppContent() {
               }
             />
             <Route path="access-denied" element={<AccessDeniedPage />} />
-          </Route>
+    </Route>
+  );
+}
+
+function AppContent() {
+  const { loading: authLoading } = useAuth();
+  const { loaded: configLoaded, login: loginConfig } = useSchoolConfig();
+  const splashEnabled = configLoaded ? (loginConfig?.splashEnabled ?? true) : true;
+  const loaderStyle = configLoaded ? (loginConfig?.loaderStyle || '') : '';
+
+  const [splashTimerExpired, setSplashTimerExpired] = useState(false);
+
+  useEffect(() => {
+    if (authLoading || !splashEnabled) return;
+    const resetId = setTimeout(() => setSplashTimerExpired(false), 0);
+    const timerId = setTimeout(() => setSplashTimerExpired(true), 1200);
+    return () => { clearTimeout(resetId); clearTimeout(timerId); };
+  }, [authLoading, splashEnabled]);
+
+  const splashVisible = authLoading || (splashEnabled && !splashTimerExpired);
+
+  return (
+    <>
+      <SplashScreen visible={splashVisible} loaderStyle={loaderStyle} />
+      <Toaster position="top-right" reverseOrder={false} />
+      <Routes>
+        <Route path="/login" element={<Navigate to="/admin/login" replace />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
+        <Route path="/admin/verify-otp" element={<AdminVerifyOTPPage />} />
+        <Route path="/admin/reset-password" element={<AdminResetPasswordPage />} />
+        <Route path="/teacher/login" element={<TeacherLoginPage />} />
+        <Route path="/student/login" element={<StudentLoginPage />} />
+        <Route path="/receptionist/login" element={<ReceptionistLoginPage />} />
+
+        {/* First-login password change: authenticated, but deliberately NOT
+            wrapped in the portal layouts so no protected data request fires. */}
+        <Route element={<ProtectedRoute allowedRoles={['teacher']} allowPasswordChange />}>
+          <Route path="/teacher/change-password" element={<ChangePasswordPage />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={['student']} allowPasswordChange />}>
+          <Route path="/student/change-password" element={<ChangePasswordPage />} />
+        </Route>
+
+        {/* Shared Admin shell. Admins and receptionists both live here: a
+            receptionist opens the same pages an Admin uses (no duplicate
+            portal), mounted under the `/admin` and `/receptionist`
+            namespaces respectively. Every page is additionally gated by
+            RequireModule, which checks the receptionist's stored permission
+            set before rendering. The backend re-checks all of this server-side. */}
+        <Route element={<ProtectedRoute allowedRoles={['admin', 'receptionist']} />}>
+          {renderAdminShell('/admin')}
+          {renderAdminShell('/receptionist')}
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>
@@ -446,6 +488,7 @@ function AppContent() {
             <Route path="homework" element={<StudentHomework />} />
             <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
             <Route path="fees" element={<StudentFees />} />
+            <Route path="fee-reminders" element={<StudentFeeReminders />} />
             <Route path="examination" element={<StudentExamination />} />
             <Route path="class-schedule" element={<StudentClassSchedule />} />
             <Route path="attendance" element={<StudentAttendance />} />
@@ -459,6 +502,7 @@ function AppContent() {
           <Route path="homework" element={<StudentHomework />} />
           <Route path="homework/:assignmentId" element={<StudentAssignmentDetail />} />
           <Route path="fees" element={<StudentFees />} />
+          <Route path="fee-reminders" element={<StudentFeeReminders />} />
           <Route path="examination" element={<StudentExamination />} />
           <Route path="class-schedule" element={<StudentClassSchedule />} />
           <Route path="attendance" element={<StudentAttendance />} />

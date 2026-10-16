@@ -255,7 +255,7 @@ const PromotionHistory = () => {
             options={[t('allClasses'), ...CLASS_NAMES]}
           />
         </div>
-        <div className="w-full sm:w-56">
+        <div className="w-full sm:w-56 sm:pb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
             {t('searchStudentName')}
           </label>

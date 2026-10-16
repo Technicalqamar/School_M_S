@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, HomeIcon, ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon, CheckCircleIcon, BellIcon, MegaphoneIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, HomeIcon, ClipboardDocumentListIcon, BanknotesIcon, AcademicCapIcon, CheckCircleIcon, BellIcon, BellAlertIcon, MegaphoneIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
@@ -38,6 +38,7 @@ const StudentSidebar = ({ isOpen, toggleSidebar, unreadNotices = 0 }) => {
     { to: base, end: true, label: t('dashboard'), icon: HomeIcon },
     { to: `${base}/homework`, end: false, label: t('homeworkAssignments'), icon: ClipboardDocumentListIcon },
     { to: `${base}/fees`, end: false, label: t('fees'), icon: BanknotesIcon },
+    { to: `${base}/fee-reminders`, end: false, label: t('feeReminders'), icon: BellAlertIcon },
     { to: `${base}/examination`, end: false, label: t('examination'), icon: AcademicCapIcon },
     { to: `${base}/attendance`, end: false, label: t('attendance'), icon: CheckCircleIcon },
     { to: `${base}/notifications`, end: false, label: t('notifications'), icon: BellIcon },

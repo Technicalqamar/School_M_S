@@ -173,6 +173,21 @@ const schoolSettingsSchema = new mongoose.Schema(
       default: false,
     },
 
+    // ─── QR Scanner Settings ──────────────────────
+    // Independent visibility switches for the two QR attendance input modes.
+    // Camera = webcam-based scanner; USB = HID keyboard scanner. Both are
+    // stored on the settings document only (never per-user) so an administrator
+    // controls them and attendance pages can only read them. Both default to
+    // ON so existing installations keep showing both scanner options.
+    cameraQrScannerEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    usbQrScannerEnabled: {
+      type: Boolean,
+      default: true,
+    },
+
     // ──────────────────────────────────────────────
     // Localization
     // ──────────────────────────────────────────────
@@ -351,6 +366,8 @@ schoolSettingsSchema.statics.getSettings = async function () {
         lateGracePeriod: 5,
         allowLeaveMarking: true,
         allowHalfDayLeave: false,
+        cameraQrScannerEnabled: true,
+        usbQrScannerEnabled: true,
         smsModuleEnabled: false,
       },
     },

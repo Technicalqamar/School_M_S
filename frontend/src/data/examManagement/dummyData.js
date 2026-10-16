@@ -4,8 +4,6 @@ export const CLASS_OPTIONS = [
   'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
 ];
 
-export const ACADEMIC_YEARS = ['2026', '2025'];
-
 export const STATUSES = ['Active', 'Inactive'];
 
 export const exams = [

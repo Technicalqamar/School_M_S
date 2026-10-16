@@ -102,6 +102,7 @@ const ACADEMIC_ALLOWED = [
   'teacherManualStudentAttendance',
   'lateAllowed', 'lateGracePeriod',
   'allowLeaveMarking', 'allowHalfDayLeave',
+  'cameraQrScannerEnabled', 'usbQrScannerEnabled',
 ];
 
 const updateAcademicConfiguration = async (data) => {

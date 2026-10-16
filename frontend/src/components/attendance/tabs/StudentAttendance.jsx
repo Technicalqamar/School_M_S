@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
+import SearchInput from '../../common/SearchInput/SearchInput';
+import { filterStudentsByNameOrId } from '../../../utils/studentSearch';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import {
   CheckCircleIcon, XCircleIcon, ClockIcon,
@@ -11,7 +14,8 @@ import SelectInput from '../../common/SelectInput/SelectInput';
 import DateInput from '../../common/DateInput/DateInput';
 import Modal from '../../common/Modal/Modal';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
-import { CLASS_NAMES, ACADEMIC_YEARS } from '../../../utils/classNames';
+import { CLASS_NAMES } from '../../../utils/classNames';
+import { useAcademicYear } from '../../../utils/academicYear';
 import { getImageUrl } from '../../../utils/imageUrl';
 import Spinner from '../../common/Spinner/Spinner';
 import Button from '../../common/Button/Button';
@@ -48,7 +52,11 @@ const PAGE_SIZE = 10;
 const StudentAttendance = () => {
   const formatTime = useFormatTime();
   const { user } = useAuth();
-  const { academic, attendanceRules, weekendSettings } = useSchoolConfig();
+  const { academic, attendanceRules, weekendSettings, scannerSettings } = useSchoolConfig();
+  // Administrator-controlled QR scanner visibility (School Settings → Attendance).
+  // Defaults to enabled when the settings have never been configured.
+  const cameraScannerEnabled = scannerSettings?.cameraEnabled !== false;
+  const usbScannerEnabled = scannerSettings?.usbEnabled !== false;
   // Marking attendance (manual status/list, Mark All Present, QR scanning and
   // check-in reset) is a `student-attendance-mark` operation. Viewing and
   // loading lists only need `student-attendance-view`.
@@ -56,8 +64,17 @@ const StudentAttendance = () => {
   const STATUS_OPTIONS = attendanceRules?.allowLeaveMarking
     ? [...BASE_STATUS_OPTIONS, 'Leave']
     : BASE_STATUS_OPTIONS;
-  const [academicYear, setAcademicYear] = useState(academic?.currentYear || '');
-  const [className, setClassName] = useState('All Classes');
+  // Normal attendance marking screen: the Academic Year is the configured one
+  // from School Settings (single option — no historical or future years).
+  const { year: academicYear, setYear: setAcademicYear, options: academicYearOptions } = useAcademicYear(academic?.currentYear);
+  const [searchParams] = useSearchParams();
+  const preselectClass = searchParams.get('class') || '';
+  const preselectStudent = searchParams.get('student') || '';
+  // Seeded from `?student=` so a workspace deep-link already filters to that
+  // student once the class roster is loaded.
+  const [rosterSearch, setRosterSearch] = useState(preselectStudent);
+
+  const [className, setClassName] = useState(preselectClass || 'All Classes');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceMethod, setAttendanceMethod] = useState('Manual Attendance');
   const [students, setStudents] = useState([]);
@@ -84,18 +101,18 @@ const StudentAttendance = () => {
   const isWeekend = weekendSettings?.enabled && weekendSettings?.days?.includes(new Date().toLocaleDateString('en-US', { weekday: 'long' }));
   const [currentPage, setCurrentPage] = useState(1);
 
-  const academicYearOptions = useMemo(() => {
-    const values = new Set([academic?.currentYear, ...ACADEMIC_YEARS].filter(Boolean));
-    return Array.from(values);
-  }, [academic?.currentYear]);
-
   const isScannerMode = attendanceMethod === 'QR Scanner';
 
-  const totalPages = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
+  const filteredStudents = useMemo(
+    () => filterStudentsByNameOrId(students, rosterSearch),
+    [students, rosterSearch]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
 
   const paginatedStudents = useMemo(
-    () => students.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [students, currentPage]
+    () => filteredStudents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filteredStudents, currentPage]
   );
 
   const stats = useMemo(() => {
@@ -107,17 +124,7 @@ const StudentAttendance = () => {
     return { present, absent, leave, late, total: students.length };
   }, [attendanceMap, students.length]);
 
-  useEffect(() => {
-    const close = () => setOpenDropdownId(null);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, []);
-
-  useEffect(() => {
-    if (academic?.currentYear && (!academicYear || academicYear === '')) {
-      setAcademicYear(academic.currentYear);
-    }
-  }, [academic?.currentYear, academicYear]);
+  const autoLoadedRef = useRef(false);
 
   const loadStudents = useCallback(async () => {
     if (isWeekend) return;
@@ -169,6 +176,22 @@ const StudentAttendance = () => {
       setLoading(false);
     }
   }, [academicYear, className, date, attendanceMethod]);
+
+  // When the Single Student workspace deep-links here with `?class=...&student=...`,
+  // load that class's roster once so the preselected student is visible without
+  // bypassing the normal class/date/session rules.
+  useEffect(() => {
+    if (autoLoadedRef.current) return undefined;
+    if (!preselectClass && !preselectStudent) return undefined;
+    if (isWeekend) return undefined;
+    if (!academicYear || !className) return undefined;
+    autoLoadedRef.current = true;
+    // Deferred so it is not a setState-in-effect cascading render.
+    const timer = setTimeout(() => {
+      loadStudents();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [preselectClass, preselectStudent, academicYear, className, isWeekend, loadStudents]);
 
   const saveSingleRecord = async (studentId, status) => {
     if (!academicYear || !className || !loaded) return;
@@ -617,6 +640,28 @@ const StudentAttendance = () => {
     };
   }, [isScannerMode, stopQrScanner, stopUsbScanner]);
 
+  // If the administrator disables a scanner while it is running, close it
+  // safely as soon as the updated setting reaches this page. The work is
+  // deferred out of the effect body so the settings update is not turned into a
+  // synchronous cascading render.
+  useEffect(() => {
+    if (cameraScannerEnabled) return undefined;
+    const timer = window.setTimeout(() => {
+      stopQrScanner();
+      setScannerMessage('');
+      setScannerMessageType('info');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [cameraScannerEnabled, stopQrScanner]);
+
+  useEffect(() => {
+    if (usbScannerEnabled) return undefined;
+    const timer = window.setTimeout(() => {
+      stopUsbScanner();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [usbScannerEnabled, stopUsbScanner]);
+
   useEffect(() => {
     if (!scannerStarted) return undefined;
 
@@ -641,79 +686,108 @@ const StudentAttendance = () => {
     return undefined;
   }, [scannerStarted, scannerElementId]);
 
-  const renderScannerPanel = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 flex-shrink-0">
-            <svg className="h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9.75A2.75 2.75 0 015.75 7h12.5A2.75 2.75 0 0121 9.75v4.5A2.75 2.75 0 0118.25 17H5.75A2.75 2.75 0 013 14.25v-4.5zm3-2.25h.01M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-6 7.5h6" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanner</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Scan a student QR code to mark attendance.</p>
-          </div>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={scannerStarted ? stopQrScanner : startQrScanner}
-          loading={scannerStarting}
-          disabled={isWeekend || !academicYear || !className || scannerStarting}
-          className="!w-auto !inline-flex items-center gap-2"
-        >
-          {scannerStarted ? 'Stop Camera Scanner' : 'Start Camera Scanner'}
-        </Button>
-      </div>
-
-      <div className="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 overflow-hidden">
-        <div className={scannerStarted ? 'relative block w-full min-h-[320px] max-h-[420px]' : 'hidden'}>
-          <div id={scannerElementId} className="absolute inset-0 w-full h-full overflow-hidden" />
-          <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-[11px] font-medium text-white">
-            Place student QR card inside the frame
-          </div>
-        </div>
-
-        {!scannerStarted && (
-          <div className="flex min-h-[320px] items-center justify-center text-center px-6">
-            <div>
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
-                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9.75A2.75 2.75 0 015.75 7h12.5A2.75 2.75 0 0121 9.75v4.5A2.75 2.75 0 0118.25 17H5.75A2.75 2.75 0 013 14.25v-4.5zm3-2.25h.01M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-6 7.5h6" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Camera preview is offline</p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Start the scanner to grant camera access and begin marking attendance.</p>
+  const renderScannerPanel = () => {
+    // Both scanners switched off by the administrator: no entry point at all.
+    if (!cameraScannerEnabled && !usbScannerEnabled) {
+      return (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
+              <svg className="h-8 w-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.34 3.94l-7.1 12.29A1.75 1.75 0 004.66 18.5h14.68a1.75 1.75 0 001.52-2.27l-7.1-12.29a1.75 1.75 0 00-3.04 0z" />
+              </svg>
             </div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanners Disabled</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                QR scanners are disabled by the school administrator.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-6 space-y-4">
+        {cameraScannerEnabled && (
+          <>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 flex-shrink-0">
+                  <svg className="h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9.75A2.75 2.75 0 015.75 7h12.5A2.75 2.75 0 0121 9.75v4.5A2.75 2.75 0 0118.25 17H5.75A2.75 2.75 0 013 14.25v-4.5zm3-2.25h.01M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-6 7.5h6" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanner</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Scan a student QR code to mark attendance.</p>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                onClick={scannerStarted ? stopQrScanner : startQrScanner}
+                loading={scannerStarting}
+                disabled={isWeekend || !academicYear || !className || scannerStarting}
+                className="!w-auto !inline-flex items-center gap-2"
+              >
+                {scannerStarted ? 'Stop Camera Scanner' : 'Start Camera Scanner'}
+              </Button>
+            </div>
+
+            <div className="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 overflow-hidden">
+              <div className={scannerStarted ? 'relative block w-full min-h-[320px] max-h-[420px]' : 'hidden'}>
+                <div id={scannerElementId} className="absolute inset-0 w-full h-full overflow-hidden" />
+                <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-900/70 px-3 py-1 text-[11px] font-medium text-white">
+                  Place student QR card inside the frame
+                </div>
+              </div>
+
+              {!scannerStarted && (
+                <div className="flex min-h-[320px] items-center justify-center text-center px-6">
+                  <div>
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9.75A2.75 2.75 0 015.75 7h12.5A2.75 2.75 0 0121 9.75v4.5A2.75 2.75 0 0118.25 17H5.75A2.75 2.75 0 013 14.25v-4.5zm3-2.25h.01M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7m-6 7.5h6" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Camera preview is offline</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Start the scanner to grant camera access and begin marking attendance.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {scannerMessage && (
+          <div className={`rounded-lg border px-3 py-2 text-sm ${
+            scannerMessageType === 'success'
+              ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-300'
+              : scannerMessageType === 'error'
+                ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300'
+                : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300'
+          }`}>
+            {scannerMessage}
+          </div>
+        )}
+
+        {usbScannerEnabled && (
+          <div className={cameraScannerEnabled ? 'pt-4 border-t border-gray-100 dark:border-gray-700' : ''}>
+            <UsbQrScanner
+              active={usbActive}
+              disabled={isWeekend || !academicYear || !className || className === 'Select Class'}
+              onActivate={startUsbScanner}
+              onDeactivate={stopUsbScanner}
+              onScan={(value) => { scanSourceRef.current = 'usb'; processScannedQr(value); }}
+              result={usbResult}
+            />
           </div>
         )}
       </div>
-
-      {scannerMessage && (
-        <div className={`rounded-lg border px-3 py-2 text-sm ${
-          scannerMessageType === 'success'
-            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-300'
-            : scannerMessageType === 'error'
-              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300'
-              : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300'
-        }`}>
-          {scannerMessage}
-        </div>
-      )}
-
-      <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
-        <UsbQrScanner
-          active={usbActive}
-          disabled={isWeekend || !academicYear || !className || className === 'Select Class'}
-          onActivate={startUsbScanner}
-          onDeactivate={stopUsbScanner}
-          onScan={(value) => { scanSourceRef.current = 'usb'; processScannedQr(value); }}
-          result={usbResult}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderStatusDropdown = (studentId, currentStatus) => {
     if (!canMark) {
@@ -827,13 +901,29 @@ const StudentAttendance = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-          {students.length === 0 ? (
+          {filteredStudents.length === 0 ? (
             <tr>
               <td colSpan={7} className="px-4 py-16 text-center">
                 <div className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                   <UserGroupIcon className="h-12 w-12 mb-3" />
-                  <p className="text-sm font-medium">{hasSearched ? 'No Students Found' : 'No Students Loaded'}</p>
-                  <p className="text-xs mt-1">{hasSearched ? 'Try different filters.' : 'Select Academic Year and Class to load students.'}</p>
+                  <p className="text-sm font-medium">
+                    {rosterSearch ? 'No Matching Students' : hasSearched ? 'No Students Found' : 'No Students Loaded'}
+                  </p>
+                  <p className="text-xs mt-1">
+                    {rosterSearch
+                      ? `No student matches “${rosterSearch}” in the loaded roster.`
+                      : hasSearched
+                        ? 'Try different filters.'
+                        : 'Select Academic Year and Class to load students.'}
+                  </p>
+                  {rosterSearch && (
+                    <button
+                      onClick={() => setRosterSearch('')}
+                      className="mt-3 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Clear search
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>
@@ -1031,6 +1121,26 @@ const StudentAttendance = () => {
           )}
         </div>
       </div>
+
+      {!loading && loaded && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="w-full sm:w-72">
+            <SearchInput
+              placeholder="Search by student name or ID"
+              value={rosterSearch}
+              onChange={(value) => {
+                setRosterSearch(value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {rosterSearch
+              ? `${filteredStudents.length} match(es) of ${students.length} loaded student${students.length === 1 ? '' : 's'}`
+              : `${students.length} student${students.length === 1 ? '' : 's'} loaded`}
+          </p>
+        </div>
+      )}
 
       {isScannerMode && canMark && renderScannerPanel()}
 

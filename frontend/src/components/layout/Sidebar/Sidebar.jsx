@@ -7,6 +7,7 @@ import { useTranslation } from '../../../hooks/useLocalization';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { hasAnyReceptionistModuleAccess, getVisibleSidebarPages } from '../../../constants/receptionistPermissions';
+import SingleStudentSidebarGroup from './SingleStudentSidebarGroup';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const [feeManagementOpen, setFeeManagementOpen] = useState(false);
@@ -26,6 +27,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   // this is a UX mirror of a server-side rule.
   const { user, role } = useAuth();
   const isReceptionist = role === 'receptionist';
+  // Receptionists browse the very same pages, mounted under the
+  // `/receptionist` namespace instead of `/admin`, so no link ever bounces
+  // them back into the Admin panel.
+  const base = isReceptionist ? '/receptionist' : '/admin';
   const canAccess = (moduleKey) => !isReceptionist || hasAnyReceptionistModuleAccess(user, moduleKey);
 
   // Dropdown modules: only the granted pages are rendered, and the collapsed
@@ -39,36 +44,37 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   );
 
   const EXAM_ITEMS = [
-    { to: '/admin/exams/setup', label: 'Exam Setup', pageKey: 'exam-setup' },
-    { to: '/admin/exams/subjects-marks', label: 'Subjects & Marks', pageKey: 'subjects-marks' },
-    { to: '/admin/exams/schedule', label: 'Exam Schedule', pageKey: 'exam-schedule' },
-    { to: '/admin/exams/admit-card', label: 'Admit Card', pageKey: 'admit-card' },
-    { to: '/admin/exams/marks-entry', label: 'Marks Entry', pageKey: 'marks-entry' },
-    { to: '/admin/exams/results', label: 'Results', pageKey: 'results' },
-    { to: '/admin/exams/result-history', label: 'Result History', pageKey: 'result-history' },
+    { to: `${base}/exams/setup`, label: 'Exam Setup', pageKey: 'exam-setup' },
+    { to: `${base}/exams/subjects-marks`, label: 'Subjects & Marks', pageKey: 'subjects-marks' },
+    { to: `${base}/exams/schedule`, label: 'Exam Schedule', pageKey: 'exam-schedule' },
+    { to: `${base}/exams/admit-card`, label: 'Admit Card', pageKey: 'admit-card' },
+    { to: `${base}/exams/marks-entry`, label: 'Marks Entry', pageKey: 'marks-entry' },
+    { to: `${base}/exams/results`, label: 'Results', pageKey: 'results' },
+    { to: `${base}/exams/result-history`, label: 'Result History', pageKey: 'result-history' },
   ].filter((item) => examPages.some((page) => page.key === item.pageKey));
 
   const FEE_ITEMS = [
-    { to: '/admin/fees/fee-structure', label: 'feeStructure', pageKey: 'fee-structure' },
-    { to: '/admin/fees/collect-fee', label: 'collectFee', pageKey: 'collect-fee' },
-    { to: '/admin/fees/student-fee-details', label: 'studentFeeDetails', pageKey: 'student-fee-details' },
-    { to: '/admin/fees/outstanding-dues', label: 'outstandingDues', pageKey: 'outstanding-dues' },
-    { to: '/admin/fees/reports', label: 'reports', pageKey: 'reports' },
-    { to: '/admin/fees/voucher-generation', label: 'feeVoucherGeneration', pageKey: 'voucher-generation' },
+    { to: `${base}/fees/fee-structure`, label: 'feeStructure', pageKey: 'fee-structure' },
+    { to: `${base}/fees/collect-fee`, label: 'collectFee', pageKey: 'collect-fee' },
+    { to: `${base}/fees/student-fee-details`, label: 'studentFeeDetails', pageKey: 'student-fee-details' },
+    { to: `${base}/fees/outstanding-dues`, label: 'outstandingDues', pageKey: 'outstanding-dues' },
+    { to: `${base}/fees/reminders`, label: 'feeReminders', pageKey: 'reminders' },
+    { to: `${base}/fees/reports`, label: 'reports', pageKey: 'reports' },
+    { to: `${base}/fees/voucher-generation`, label: 'feeVoucherGeneration', pageKey: 'voucher-generation' },
   ].filter((item) => feePages.some((page) => page.key === item.pageKey));
 
   const ACCOUNT_ITEMS = [
-    { to: '/admin/accounts/all', label: 'allAccounts', pageKey: 'all-accounts' },
-    { to: '/admin/accounts/create', label: 'createAccount', pageKey: 'create-account' },
-    { to: '/admin/accounts/access', label: 'accountAccess', pageKey: 'account-access' },
+    { to: `${base}/accounts/all`, label: 'allAccounts', pageKey: 'all-accounts' },
+    { to: `${base}/accounts/create`, label: 'createAccount', pageKey: 'create-account' },
+    { to: `${base}/accounts/access`, label: 'accountAccess', pageKey: 'account-access' },
   ].filter((item) => accountPages.some((page) => page.key === item.pageKey));
 
   const COMMUNICATION_ITEMS = [
-    { to: '/admin/communication/sms', label: 'sms', pageKey: 'sms' },
-    { to: '/admin/communication/notices', label: 'notices', pageKey: 'notices' },
-    { to: '/admin/communication/notifications', label: 'notifications', pageKey: 'notifications' },
+    { to: `${base}/communication/sms`, label: 'sms', pageKey: 'sms' },
+    { to: `${base}/communication/notices`, label: 'notices', pageKey: 'notices' },
+    { to: `${base}/communication/notifications`, label: 'notifications', pageKey: 'notifications' },
   ]
-    .filter((item) => smsModuleEnabled || item.to !== '/admin/communication/sms')
+    .filter((item) => smsModuleEnabled || item.to !== `${base}/communication/sms`)
     .filter((item) => communicationPages.some((page) => page.key === item.pageKey));
 
   return (
@@ -135,7 +141,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('dashboard') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin"
+                  to={`${base}`}
                   end
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
@@ -160,7 +166,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('student-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/students"
+                  to={`${base}/students`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -179,10 +185,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 </NavLink>
               </li>
             )}
+            {/* Context-aware single-student section. Renders only while a
+                student workspace is open (and only for a user who may open it),
+                so the shared Admin sidebar is never duplicated. */}
+            <SingleStudentSidebarGroup
+              base={base}
+              isOpen={isOpen}
+              onNavigate={() => {
+                if (window.innerWidth < 768) toggleSidebar();
+              }}
+            />
             {canAccess('teacher-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/teachers"
+                  to={`${base}/teachers`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -204,7 +220,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('class-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/classes"
+                  to={`${base}/classes`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -226,7 +242,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('subject-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/subjects"
+                  to={`${base}/subjects`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -248,7 +264,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('timetable-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/timetable"
+                  to={`${base}/timetable`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -270,7 +286,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('attendance-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/attendance"
+                  to={`${base}/attendance`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -292,7 +308,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('events-and-holidays') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/events"
+                  to={`${base}/events`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -370,7 +386,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('payroll-management') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/payroll"
+                  to={`${base}/payroll`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -508,7 +524,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {role === 'admin' && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/receptionists"
+                  to={`${base}/receptionists`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive
@@ -586,7 +602,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {canAccess('school-settings') && (
               <li className="flex justify-center">
                 <NavLink
-                  to="/admin/settings"
+                  to={`${base}/settings`}
                   className={({ isActive }) =>
                     `flex items-center transition-all duration-200 rounded-lg ${
                       isActive

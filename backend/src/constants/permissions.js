@@ -277,6 +277,7 @@ const RECEPTIONIST_MODULES = [
       { key: 'collect-fee', label: 'Collect Fee', actions: [] },
       { key: 'student-fee-details', label: 'Student Fee Details', actions: [] },
       { key: 'outstanding-dues', label: 'Outstanding Dues', actions: [] },
+      { key: 'reminders', label: 'Fee Reminders', actions: [] },
       { key: 'reports', label: 'Reports', actions: [] },
       { key: 'voucher-generation', label: 'Fee Voucher Generation', actions: [] },
     ],

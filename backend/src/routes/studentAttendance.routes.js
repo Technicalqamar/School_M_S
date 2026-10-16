@@ -12,7 +12,7 @@ import {
   deleteBulkAttendance,
   resetCheckIn,
 } from '../controllers/studentAttendance.controller.js';
-import { validateSaveAttendance, validateGetAttendance, validateQrScan } from '../validations/studentAttendance.validation.js';
+import { validateSaveAttendance, validateGetAttendance, validateQrScan, validateDeleteBulkAttendance } from '../validations/studentAttendance.validation.js';
 import { protect } from '../middlewares/auth.middleware.js';
 import { requireActionAccess } from '../middlewares/permission.middleware.js';
 
@@ -96,6 +96,7 @@ router.delete(
   '/',
   protect,
   requireActionAccess('attendance-management', 'student-attendance-mark'),
+  validateDeleteBulkAttendance,
   deleteBulkAttendance,
 );
 

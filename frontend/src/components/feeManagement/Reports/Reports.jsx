@@ -10,6 +10,7 @@ import SelectInput from '../../common/SelectInput/SelectInput';
 import DateInput from '../../common/DateInput/DateInput';
 import Button from '../../common/Button/Button';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { resolveCurrentAcademicYear } from '../../../utils/academicYear';
 import feeService from '../../../services/fee/fee.service.js';
 
 const formatCurrency = (val) => `Rs. ${Number(val).toLocaleString()}`;
@@ -28,7 +29,7 @@ const MONTHS_ORDER = [
 ];
 
 const Reports = () => {
-  const { schoolInfo } = useSchoolConfig();
+  const { schoolInfo, academic } = useSchoolConfig();
   const [scope, setScope] = useState('Overall');
   const [academicYear, setAcademicYear] = useState('');
   const [feeType, setFeeType] = useState('');
@@ -39,7 +40,7 @@ const Reports = () => {
   const [studentQuery, setStudentQuery] = useState('');
   const [generatedFilters, setGeneratedFilters] = useState(null);
 
-  const currentYear = schoolInfo?.academicYear?.currentYear || String(new Date().getFullYear());
+  const currentYear = resolveCurrentAcademicYear(academic?.currentYear);
 
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);

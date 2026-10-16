@@ -52,12 +52,16 @@ const portalTargets = (base) => ({
   MARKS_SUBMITTED: () => `${base}/examination`,
   RESULT_PUBLISHED: () => `${base}/examination`,
   FEE_COLLECTED: () => `${base}/fees`,
+  // Fee reminders have their own portal inbox (the same Notifications page
+  // narrowed to FEE_REMINDER), so the notification opens that instead.
+  FEE_REMINDER: () => `${base}/fee-reminders`,
 });
 
 const ADMIN_TARGETS = {
   // Student Management, opened straight on the new student's own profile.
   STUDENT_CREATED: ({ relatedId }) => (relatedId ? `/admin/students/${relatedId}` : '/admin/students'),
   FEE_COLLECTED: () => '/admin/fees/collect-fee',
+  FEE_REMINDER: () => '/admin/fees/reminders',
   // Leave Management is the "Leave" tab of the existing Admin Attendance page.
   LEAVE_REQUESTED: () => '/admin/attendance',
   LEAVE_APPROVED: () => '/admin/attendance',
@@ -82,6 +86,7 @@ const TEACHER_TARGETS = {
   // Teachers are not fee recipients and never receive these two.
   STUDENT_CREATED: () => null,
   FEE_COLLECTED: () => null,
+  FEE_REMINDER: () => null,
 };
 
 const TARGETS = {

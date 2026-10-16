@@ -9,18 +9,41 @@ import Receptionist from '../models/receptionist.model.js';
 // before using the portal. Until then their access is limited to the exact paths
 // needed to complete that flow (fetch session/flag, log out, change password).
 // The refresh-token route is public (no `protect`), so it needs no entry here.
-const PASSWORD_CHANGE_ALLOWLIST = ['/auth/me', '/auth/logout', '/profile/change-password'];
+//
+// These are the FULL request paths (including the `/api/v1` mount prefix) and are
+// matched by exact pathname equality only. Matching the raw `req.originalUrl`
+// with a substring test let any request that merely *contained* an allow-listed
+// fragment - for example `/api/v1/students?x=/auth/me` - slip past the gate,
+// because a query string is part of `originalUrl`.
+const API_PREFIX = '/api/v1';
+const PASSWORD_CHANGE_ALLOWLIST = new Set([
+  `${API_PREFIX}/auth/me`,
+  `${API_PREFIX}/auth/logout`,
+  `${API_PREFIX}/profile/change-password`,
+]);
 
 // Tokens issued for admin-authorized portal access (see portalAccess.service) must
 // keep working regardless of the flag; Admin sessions are never affected because
 // Admin records do not carry `mustChangePassword`.
 const PORTAL_ACCESS_TYPE = 'admin_portal_access';
 
+// `req.originalUrl` always carries the query string, while `req.path`/`req.baseUrl`
+// shift depending on which router this middleware runs in. Derive the pathname
+// from `originalUrl`, discard the query entirely, and normalise a single trailing
+// slash so the only thing that can ever satisfy the allow-list is an exact path.
+const getRequestPathname = (req) => {
+  const rawPath = (req.originalUrl || '').split('?')[0];
+  if (rawPath.length > 1 && rawPath.endsWith('/')) {
+    return rawPath.slice(0, -1);
+  }
+  return rawPath;
+};
+
 const isPasswordChangePending = (req) =>
-  req.user &&
+  Boolean(req.user) &&
   req.user.mustChangePassword === true &&
   req.accessType !== PORTAL_ACCESS_TYPE &&
-  !PASSWORD_CHANGE_ALLOWLIST.some((path) => req.originalUrl.includes(path));
+  !PASSWORD_CHANGE_ALLOWLIST.has(getRequestPathname(req));
 
 const protect = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -80,4 +103,4 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { protect };
+export { protect, isPasswordChangePending };

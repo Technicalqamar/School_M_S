@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../../../hooks/useLocalization';
 import { UsersIcon, ShieldCheckIcon, NoSymbolIcon, PlusIcon } from '@heroicons/react/24/outline';
 import StatCard from '../../common/StatCard/StatCard';
@@ -18,6 +18,9 @@ const ITEMS_PER_PAGE = 10;
 const AllAccounts = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Stay inside the current portal namespace (`/admin` or `/receptionist`).
+  const base = location.pathname.startsWith('/receptionist') ? '/receptionist' : '/admin';
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState(() => `all::${t('all')}`);
   const [statusFilter, setStatusFilter] = useState(() => `all::${t('all')}`);
@@ -243,7 +246,7 @@ const AllAccounts = () => {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('allAccountsSubtitle')}</p>
         </div>
         <button
-          onClick={() => navigate('/admin/accounts/create')}
+          onClick={() => navigate(`${base}/accounts/create`)}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
         >
           <PlusIcon className="h-4 w-4" />

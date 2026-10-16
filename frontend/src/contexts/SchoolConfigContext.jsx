@@ -11,6 +11,10 @@ const DEFAULTS = {
   localization: { currency: '', currencySymbol: '', defaultLanguage: 'English', timeFormat: '' },
   preferences: { autoLogout: true, defaultLandingPage: '', enableNotifications: true, enableEmailNotifications: true, enableSmsNotifications: false, enableWhatsAppNotifications: false, smsModuleEnabled: false },
   attendanceRules: { allowEditAfterSubmit: false, editTimeLimit: 1, autoMarkAbsent: false, lateAllowed: false, lateGracePeriod: 5, allowLeaveMarking: true, allowHalfDayLeave: false },
+  // Independent visibility switches for the QR attendance input modes. Both
+  // default ON so attendance pages keep showing both scanners until an
+  // administrator turns one (or both) off in School Settings → Attendance.
+  scannerSettings: { cameraEnabled: true, usbEnabled: true },
   weekendSettings: { enabled: true, days: ['Saturday', 'Sunday'] },
   login: { showSchoolLogoOnLogin: true, showSchoolNameOnLogin: true, splashEnabled: true, loaderStyle: '' },
 };
@@ -75,6 +79,10 @@ export const SchoolConfigProvider = ({ children }) => {
           allowLeaveMarking: s.allowLeaveMarking ?? true,
           allowHalfDayLeave: s.allowHalfDayLeave ?? false,
         },
+        scannerSettings: {
+          cameraEnabled: s.cameraQrScannerEnabled ?? true,
+          usbEnabled: s.usbQrScannerEnabled ?? true,
+        },
         weekendSettings: {
           enabled: s.weekendEnabled ?? true,
           days: s.weekendDays || ['Saturday', 'Sunday'],
@@ -97,6 +105,12 @@ export const SchoolConfigProvider = ({ children }) => {
           schoolInfo: { ...prev.schoolInfo, name: pub.schoolName || '', logo: pub.logo || null, principalName: pub.principalName || '' },
           branding: { ...prev.branding, adminLogo: pub.adminPanelLogo || null },
           academic: { ...prev.academic, currentYear: pub.currentAcademicYear || '' },
+          // The public payload carries the scanner switches so roles without the
+          // School Settings grant still honour the administrator's choice.
+          scannerSettings: {
+            cameraEnabled: pub.cameraQrScannerEnabled !== false,
+            usbEnabled: pub.usbQrScannerEnabled !== false,
+          },
           loading: false,
           loaded: true,
         }));

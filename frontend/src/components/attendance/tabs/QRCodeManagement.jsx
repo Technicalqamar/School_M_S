@@ -10,6 +10,12 @@ import StatCard from '../../common/StatCard/StatCard';
 import SearchInput from '../../common/SearchInput/SearchInput';
 import Modal from '../../common/Modal/Modal';
 import { CLASS_NAMES } from '../../../utils/classNames';
+import { resolveCurrentAcademicYear, useAcademicYear } from '../../../utils/academicYear';
+import {
+  buildDesignPayload,
+  extractSavedDesign,
+  resolveDesignTargets,
+} from '../../../utils/idCardDesign';
 import { VerticalTemplate, HorizontalTemplate } from '../templates';
 import { getInitials } from '../templates/shared/cardHtmlUtils';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
@@ -45,7 +51,10 @@ const IDCardManagement = () => {
 
   const [allStudents, setAllStudents] = useState([]);
   const [allTeachers, setAllTeachers] = useState([]);
-  const [academicYear, setAcademicYear] = useState(academic?.currentYear || '');
+  // Current Academic Year from School Settings (or the calendar year), never a
+  // hardcoded value.
+  const currentYear = resolveCurrentAcademicYear(academic?.currentYear);
+  const { year: academicYear, setYear: setAcademicYear } = useAcademicYear(academic?.currentYear);
   const [cardType, setCardType] = useState('Student');
   const [className, setClassName] = useState('All Classes');
   const [search, setSearch] = useState('');
@@ -95,12 +104,6 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
     }
   }, [designerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (academic?.currentYear && !academicYear) {
-      setAcademicYear(academic.currentYear);
-    }
-  }, [academic?.currentYear, academicYear]);
-
   const normalizeTeacherCard = (teacher) => ({
     ...teacher,
     id: teacher._id || teacher.id,
@@ -110,7 +113,7 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
     teacherId: teacher.teacherId || teacher.studentId || teacher.id,
     fatherName: teacher.fatherName || '—',
     fatherPhone: teacher.phoneNumber || teacher.alternatePhoneNumber || '—',
-    academicYear: teacher.academicYear || academicYear || '2026',
+    academicYear: teacher.academicYear || academicYear || currentYear,
     class: teacher.class || 'Teacher',
     qrValue: teacher.qrValue || `QR-${teacher.teacherId || teacher.studentId || teacher.id}`,
     qrStatus: teacher.qrStatus || 'Generated',
@@ -211,7 +214,7 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
           fullName: teacher.fullName || 'Teacher',
           studentId: teacher.teacherId || teacher.studentId || teacher.id,
           teacherId: teacher.teacherId || teacher.studentId || teacher.id,
-          academicYear: teacher.academicYear || academicYear || academic?.currentYear || '2026',
+          academicYear: teacher.academicYear || academicYear || currentYear,
           qrValue: teacher.qrValue || `QR-${teacher.teacherId || teacher.studentId || teacher.id}`,
           qrStatus: teacher.qrStatus || 'Generated',
           cardStatus: teacher.cardStatus || 'Pending',
@@ -235,6 +238,19 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
       const students = result.students || [];
       setAllStudents(students);
       setAllTeachers([]);
+      // Restore the design previously saved for these cards. The designer is a
+      // single layout for the whole working set, so any card carrying a saved
+      // design defines the layout shown in the designer and used for printing.
+      const savedDesign = extractSavedDesign(students);
+      if (savedDesign) {
+        const front = { ...DEFAULT_CONFIG, ...(savedDesign.frontDesign || {}) };
+        const back = { ...DEFAULT_CONFIG, ...(savedDesign.backDesign || {}) };
+        setFrontConfig(front);
+        setBackConfig(back);
+        setSelectedTemplate(savedDesign.template);
+        setSavedTemplate(savedDesign.template);
+        setSavedDesignerConfig({ front, back });
+      }
       if (students.length === 0) {
         toast(t('noStudentsLoaded'), { icon: 'ℹ️' });
       } else {
@@ -346,6 +362,72 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
       await handleLoadStudents();
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to regenerate QR code');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleSaveDesign = async () => {
+    if (!selectedTemplate) return;
+
+    const nextTemplate = selectedTemplate;
+    const nextConfig = { front: { ...frontConfig }, back: { ...backConfig } };
+
+    // Teacher cards have no persistence API. Keep the previous local-only
+    // behaviour instead of posting teacher ids to the student design endpoint.
+    if (cardType === 'Teacher') {
+      setSavedTemplate(nextTemplate);
+      setSavedDesignerConfig(nextConfig);
+      toast.success('Design saved successfully');
+      return;
+    }
+
+    const targets = resolveDesignTargets({ selectedIds, students: filtered });
+    if (targets.length === 0) {
+      toast.error('Load students before saving the design');
+      return;
+    }
+    if (actionBusy) return;
+
+    // Reflect the scope actually being written: an explicit selection when the
+    // user made one, otherwise every card currently in view.
+    const usingSelection = selectedIds.size > 0;
+
+    setActionBusy(true);
+    try {
+      const payload = buildDesignPayload({
+        template: nextTemplate,
+        frontConfig,
+        backConfig,
+      });
+      // One layout, many per-student cards: persist to every card in scope.
+      for (const studentId of targets) {
+        await qrManagementService.updateCardDesign(studentId, payload);
+      }
+      setSavedTemplate(nextTemplate);
+      setSavedDesignerConfig(nextConfig);
+      setAllStudents((prev) =>
+        prev.map((s) =>
+          targets.includes(s.id) || targets.includes(s._id)
+            ? {
+                ...s,
+                card: {
+                  ...(s.card || {}),
+                  template: payload.template,
+                  frontDesign: payload.frontDesign,
+                  backDesign: payload.backDesign,
+                },
+              }
+            : s,
+        ),
+      );
+      toast.success(
+        usingSelection
+          ? `Design saved for ${targets.length} selected card${targets.length !== 1 ? 's' : ''}`
+          : `Design saved for all ${targets.length} card${targets.length !== 1 ? 's' : ''} in view`,
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to save the design');
     } finally {
       setActionBusy(false);
     }
@@ -527,7 +609,7 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
                 className="appearance-none w-full px-3 py-2.5 pr-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 <option value="">{t('selectYear')}</option>
-                {academic?.currentYear ? <option value={academic.currentYear}>{academic.currentYear}</option> : null}
+                {currentYear ? <option value={currentYear}>{currentYear}</option> : null}
               </select>
               <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
@@ -856,7 +938,7 @@ const DEFAULT_CONFIG = { cardWidth: 320, cardHeight: 0, cardPadding: 16, borderR
           {selectedTemplate && (
             <div className="pt-2">
               <button
-                onClick={() => { setSavedTemplate(selectedTemplate); setSavedDesignerConfig({ front: { ...frontConfig }, back: { ...backConfig } }); toast.success('Design saved successfully'); }}
+                onClick={handleSaveDesign}
                 className="w-full px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>

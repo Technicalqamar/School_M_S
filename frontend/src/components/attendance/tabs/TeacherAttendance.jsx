@@ -12,7 +12,7 @@ import SelectInput from '../../common/SelectInput/SelectInput';
 import DateInput from '../../common/DateInput/DateInput';
 import Modal from '../../common/Modal/Modal';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
-import { ACADEMIC_YEARS } from '../../../utils/classNames';
+import { useAcademicYear } from '../../../utils/academicYear';
 import Spinner from '../../common/Spinner/Spinner';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
 import teacherAttendanceService from '../../../services/teacherAttendance/teacherAttendance.service';
@@ -57,7 +57,11 @@ const getWorkingHours = (checkIn, checkOut) => {
 const PAGE_SIZE = 10;
 
 const TeacherAttendance = () => {
-  const { localization } = useSchoolConfig();
+  const { localization, academic, scannerSettings } = useSchoolConfig();
+  // Administrator-controlled QR scanner visibility (School Settings → Attendance).
+  // Defaults to enabled when the settings have never been configured.
+  const cameraScannerEnabled = scannerSettings?.cameraEnabled !== false;
+  const usbScannerEnabled = scannerSettings?.usbEnabled !== false;
   const { user } = useAuth();
   // Check-in/check-out, manual status edits and record resets are
   // `teacher-attendance-mark` operations. Viewing only needs
@@ -77,7 +81,9 @@ const TeacherAttendance = () => {
       hour12,
     });
   }, [hour12]);
-  const [academicYear, setAcademicYear] = useState('2026');
+  // Normal attendance marking screen: the Academic Year is the configured one
+  // from School Settings (single option — no historical or future years).
+  const { year: academicYear, setYear: setAcademicYear, options: academicYearOptions } = useAcademicYear(academic?.currentYear);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceMode, setAttendanceMode] = useState('Manual Attendance');
@@ -704,6 +710,28 @@ const TeacherAttendance = () => {
     };
   }, [isScannerMode, stopQrScanner, stopUsbScanner]);
 
+  // If the administrator disables a scanner while it is running, close it
+  // safely as soon as the updated setting reaches this page. The work is
+  // deferred out of the effect body so the settings update is not turned into a
+  // synchronous cascading render.
+  useEffect(() => {
+    if (cameraScannerEnabled) return undefined;
+    const timer = window.setTimeout(() => {
+      stopQrScanner();
+      setScannerMessage('');
+      setScannerMessageType('info');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [cameraScannerEnabled, stopQrScanner]);
+
+  useEffect(() => {
+    if (usbScannerEnabled) return undefined;
+    const timer = window.setTimeout(() => {
+      stopUsbScanner();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [usbScannerEnabled, stopUsbScanner]);
+
   const renderTable = () => (
     <>
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto">
@@ -887,7 +915,7 @@ const TeacherAttendance = () => {
             name="academicYear"
             value={academicYear}
             onChange={(event) => setAcademicYear(event.target.value)}
-            options={ACADEMIC_YEARS}
+            options={academicYearOptions}
             placeholder="Select year"
           />
           <div className="mb-4">
@@ -951,43 +979,67 @@ const TeacherAttendance = () => {
       </div>
 
       {isScannerMode && canMark && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanner</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Scan either a Student or Teacher QR to mark attendance instantly.</p>
+        !cameraScannerEnabled && !usbScannerEnabled ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
+                <svg className="h-8 w-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.34 3.94l-7.1 12.29A1.75 1.75 0 004.66 18.5h14.68a1.75 1.75 0 001.52-2.27l-7.1-12.29a1.75 1.75 0 00-3.04 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanners Disabled</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  QR scanners are disabled by the school administrator.
+                </p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={startQrScanner}
-              disabled={scannerStarting || scannerStarted}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {scannerStarting ? 'Starting...' : scannerStarted ? 'Scanner Active' : 'Start Camera Scanner'}
-            </button>
           </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            {cameraScannerEnabled && (
+              <>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">QR Scanner</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Scan either a Student or Teacher QR to mark attendance instantly.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={startQrScanner}
+                    disabled={scannerStarting || scannerStarted}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {scannerStarting ? 'Starting...' : scannerStarted ? 'Scanner Active' : 'Start Camera Scanner'}
+                  </button>
+                </div>
 
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-black/5 dark:bg-black/20 min-h-[320px]">
-            <div id={scannerElementId} className="relative w-full min-h-[320px]" />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-black/5 dark:bg-black/20 min-h-[320px]">
+                  <div id={scannerElementId} className="relative w-full min-h-[320px]" />
+                </div>
+              </>
+            )}
+
+            {scannerMessage && (
+              <div className={`mt-4 rounded-lg border px-3 py-2 text-sm ${scannerMessageType === 'success' ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : scannerMessageType === 'error' ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300' : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'}`}>
+                {scannerMessage}
+              </div>
+            )}
+
+            {usbScannerEnabled && (
+              <div className={cameraScannerEnabled ? 'mt-4 pt-4 border-t border-gray-100 dark:border-gray-700' : ''}>
+                <UsbQrScanner
+                  active={usbActive}
+                  disabled={!academicYear}
+                  onActivate={startUsbScanner}
+                  onDeactivate={stopUsbScanner}
+                  onScan={(value) => { scanSourceRef.current = 'usb'; processScannedQr(value); }}
+                  result={usbResult}
+                />
+              </div>
+            )}
           </div>
-
-          {scannerMessage && (
-            <div className={`mt-4 rounded-lg border px-3 py-2 text-sm ${scannerMessageType === 'success' ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : scannerMessageType === 'error' ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300' : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'}`}>
-              {scannerMessage}
-            </div>
-          )}
-
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <UsbQrScanner
-              active={usbActive}
-              disabled={!academicYear}
-              onActivate={startUsbScanner}
-              onDeactivate={stopUsbScanner}
-              onScan={(value) => { scanSourceRef.current = 'usb'; processScannedQr(value); }}
-              result={usbResult}
-            />
-          </div>
-        </div>
+        )
       )}
 
       {loading && renderLoadingState()}

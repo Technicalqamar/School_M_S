@@ -8,7 +8,8 @@ import {
 } from '@heroicons/react/24/outline';
 import StatCard from '../../common/StatCard/StatCard';
 import SearchInput from '../../common/SearchInput/SearchInput';
-import { CLASS_NAMES, ACADEMIC_YEARS, DEPARTMENTS } from '../../../utils/classNames';
+import { CLASS_NAMES, DEPARTMENTS } from '../../../utils/classNames';
+import { getAcademicYearOptions } from '../../../utils/academicYear';
 import attendanceHistoryService from '../../../services/attendanceHistory/attendanceHistory.service';
 
 const STATUS_OPTIONS = ['All', 'Present', 'Absent', 'Leave', 'Late'];
@@ -103,8 +104,15 @@ const PRINT_CSS = `
 
 const AttendanceHistory = () => {
   const { t } = useTranslation();
-  const { schoolInfo } = useSchoolConfig();
+  const { schoolInfo, academic } = useSchoolConfig();
   const [allRecords, setAllRecords] = useState([]);
+  // Academic years that actually exist in the loaded records — the only source
+  // for the history year filter, so the dropdown never invents an arbitrary range.
+  const [recordYears, setRecordYears] = useState([]);
+  const academicYearOptions = useMemo(
+    () => getAcademicYearOptions(academic?.currentYear, recordYears),
+    [academic?.currentYear, recordYears],
+  );
   const [type, setType] = useState('All');
   const [academicYear, setAcademicYear] = useState('');
   const [className, setClassName] = useState('');
@@ -120,7 +128,10 @@ const AttendanceHistory = () => {
     const loadRecords = async () => {
       try {
         const records = await attendanceHistoryService.getRecords();
-        if (!cancelled) setAllRecords(records);
+        if (!cancelled) {
+          setAllRecords(records);
+          setRecordYears([...new Set(records.map((r) => r.academicYear).filter(Boolean))]);
+        }
       } catch {
         if (!cancelled) setAllRecords([]);
       }
@@ -188,6 +199,7 @@ const AttendanceHistory = () => {
     try {
       const records = await attendanceHistoryService.getRecords();
       setAllRecords(records);
+      setRecordYears([...new Set(records.map((r) => r.academicYear).filter(Boolean))]);
     } catch {
       setAllRecords([]);
     }
@@ -462,7 +474,7 @@ const AttendanceHistory = () => {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('attendanceType')}</label>
             <div className="relative">
@@ -479,7 +491,7 @@ const AttendanceHistory = () => {
               <select value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}
                 className="appearance-none w-full px-3 py-2.5 pr-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
                 <option value="">{t('allYears')}</option>
-                {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                {academicYearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
               <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>

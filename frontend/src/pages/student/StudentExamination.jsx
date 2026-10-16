@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import toast from 'react-hot-toast';
 import {
   AcademicCapIcon,
   CalendarDaysIcon,

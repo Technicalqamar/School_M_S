@@ -297,6 +297,28 @@ const AcademicConfiguration = ({ data, onSave, saving }) => {
         </div>
       </CardSection>
 
+      <CardSection title="QR Scanner Settings">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <Toggle
+            label="Camera QR Scanner"
+            checked={form.cameraQrScannerEnabled}
+            onChange={handleToggle('cameraQrScannerEnabled')}
+            disabled={!editing}
+          />
+          <Toggle
+            label="USB QR Scanner"
+            checked={form.usbQrScannerEnabled}
+            onChange={handleToggle('usbQrScannerEnabled')}
+            disabled={!editing}
+          />
+        </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 -mb-1">
+          Controls which QR scanners appear in Student Attendance and Teacher Attendance. Turn a scanner OFF to hide its
+          button and entry point everywhere. When both are OFF, both attendance pages show a message that QR scanners are
+          disabled. These settings are independent.
+        </p>
+      </CardSection>
+
       <div className="flex items-center gap-3">
         {editing ? (
           <button

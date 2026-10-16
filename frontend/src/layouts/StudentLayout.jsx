@@ -7,6 +7,7 @@ import {
   AcademicCapIcon,
   CheckCircleIcon,
   BellIcon,
+  BellAlertIcon,
   MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 import StudentSidebar from '../components/layout/StudentSidebar/StudentSidebar';
@@ -53,13 +54,15 @@ const StudentLayout = ({ children }) => {
     { to: `${base}/attendance`, end: false, labelKey: 'attendance', icon: CheckCircleIcon },
   ];
 
-  // The More sheet holds exactly three destinations: Examination, Notices,
-  // Notifications. Examination moved here from the bottom bar on purpose.
+  // The More sheet holds the remaining destinations: Examination, Fee
+  // Reminders, Notices, Notifications. Examination moved here from the bottom
+  // bar on purpose. Fee Reminders mirrors the portal sidebar, which lists it.
   // Class Schedule is left out: it is not a sidebar module today (it is reached
   // from the dashboard Quick Access), and adding it here would change the module
   // list rather than mirror it.
   const moreItems = [
     { to: `${base}/examination`, end: false, labelKey: 'examination', icon: AcademicCapIcon },
+    { to: `${base}/fee-reminders`, end: false, labelKey: 'feeReminders', icon: BellAlertIcon },
     { to: `${base}/notices`, end: false, labelKey: 'notices', icon: MegaphoneIcon, showNoticeBadge: true },
     { to: `${base}/notifications`, end: false, labelKey: 'notifications', icon: BellIcon },
   ];

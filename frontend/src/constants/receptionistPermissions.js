@@ -18,6 +18,32 @@
 // The helpers below mirror the backend predicates so the frontend guards cannot
 // drift from the server-side enforcement.
 
+// The shared Admin shell is mounted under two URL namespaces: `/admin` for the
+// Admin panel and `/receptionist` for the Receptionist portal. The catalogue
+// below stores each module's canonical (Admin) path; these helpers translate
+// that canonical path into the namespace of the signed-in portal so a
+// Receptionist is never bounced back into `/admin` and an Admin is never moved
+// out of it.
+export const ADMIN_BASE_PATH = '/admin';
+export const RECEPTIONIST_BASE_PATH = '/receptionist';
+
+export const getPortalBasePath = (role) =>
+  role === 'receptionist' ? RECEPTIONIST_BASE_PATH : ADMIN_BASE_PATH;
+
+// Rewrites an `/admin...` path into the given role's namespace. Non-`/admin`
+// paths (and the Admin role) are returned unchanged, so Admin routing is
+// byte-for-byte identical to before.
+export const toPortalPath = (role, path) => {
+  if (!path) return path;
+  const base = getPortalBasePath(role);
+  if (base === ADMIN_BASE_PATH) return path;
+  if (path === ADMIN_BASE_PATH) return base;
+  if (path.startsWith(`${ADMIN_BASE_PATH}/`)) {
+    return `${base}${path.slice(ADMIN_BASE_PATH.length)}`;
+  }
+  return path;
+};
+
 export const RECEPTIONIST_PERMISSION_MODULES = [
   {
     key: 'dashboard',
@@ -271,6 +297,7 @@ export const RECEPTIONIST_PERMISSION_MODULES = [
       { key: 'collect-fee', label: 'Collect Fee', path: '/admin/fees/collect-fee', actions: [] },
       { key: 'student-fee-details', label: 'Student Fee Details', path: '/admin/fees/student-fee-details', actions: [] },
       { key: 'outstanding-dues', label: 'Outstanding Dues', path: '/admin/fees/outstanding-dues', actions: [] },
+      { key: 'reminders', label: 'Fee Reminders', path: '/admin/fees/reminders', actions: [] },
       { key: 'reports', label: 'Reports', path: '/admin/fees/reports', actions: [] },
       { key: 'voucher-generation', label: 'Fee Voucher Generation', path: '/admin/fees/voucher-generation', actions: [] },
     ],
@@ -606,27 +633,34 @@ export const filterTabsByPermission = (user, moduleKey, tabs) => {
 };
 
 // First route a receptionist can actually open, used for the post-login landing
-// and the "first grant" resolver. The Dashboard module maps to `/admin`;
+// and the "first grant" resolver. Paths are returned in the Receptionist
+// namespace (`/receptionist/...`): the Dashboard module maps to `/receptionist`;
 // otherwise the first granted module path, the first granted page path, or the
 // first module whose page/action is granted. Capability modules have no route
 // and are skipped. Returns null when nothing is granted (the user is sent to
-// `/admin/access-denied`).
+// `/receptionist/access-denied`).
 export const findFirstAccessibleModulePath = (user) => {
   if (!user || user.role !== 'receptionist') return null;
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   for (const module of RECEPTIONIST_PERMISSION_MODULES) {
     if (!module.path) continue;
-    if (permissions.includes(buildModuleKey(module.key))) return module.path;
+    if (permissions.includes(buildModuleKey(module.key))) {
+      return toPortalPath('receptionist', module.path);
+    }
   }
   for (const module of RECEPTIONIST_PERMISSION_MODULES) {
     for (const page of module.pages) {
       if (!page.path) continue;
-      if (permissions.includes(buildPageKey(module.key, page.key))) return page.path;
+      if (permissions.includes(buildPageKey(module.key, page.key))) {
+        return toPortalPath('receptionist', page.path);
+      }
     }
   }
   for (const module of RECEPTIONIST_PERMISSION_MODULES) {
     if (!module.path) continue;
-    if (hasAnyGrantForModule(permissions, module.key)) return module.path;
+    if (hasAnyGrantForModule(permissions, module.key)) {
+      return toPortalPath('receptionist', module.path);
+    }
   }
   return null;
 };

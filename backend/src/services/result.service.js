@@ -81,7 +81,7 @@ const getStudent = async (rawStudentId) => {
   return student;
 };
 
-const buildSubjectResult = (config, mark) => {
+export const buildSubjectResult = (config, mark) => {
   const totalMarks = mark && typeof mark.totalMarks === 'number' ? mark.totalMarks : config.totalMarks;
   const obtainedMarks = mark ? mark.obtainedMarks : null;
   const entered = Boolean(mark);

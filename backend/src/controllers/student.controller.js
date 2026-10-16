@@ -71,4 +71,39 @@ const deleteStudent = asyncHandler(async (req, res) => {
   });
 });
 
-export { createStudent, getAllStudents, getStudentById, updateStudent, deleteStudent };
+// Sends a single in-app notice/reminder to the selected student's portal inbox.
+// The recipient is resolved server-side from the route's studentId; the request
+// body only carries the message details.
+const sendStudentNotice = asyncHandler(async (req, res) => {
+  const result = await studentService.sendStudentNotice(req.params.studentId, req.body, req.user?._id);
+
+  return res.status(201).json({
+    success: true,
+    message: 'Notice sent to the student portal successfully',
+    data: {
+      notification: result.notification,
+      created: result.created,
+      recipient: result.recipient,
+    },
+  });
+});
+
+const getStudentNoticeRecipient = asyncHandler(async (req, res) => {
+  const result = await studentService.getStudentNoticeRecipient(req.params.studentId);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Student notice recipient resolved',
+    data: { recipient: result },
+  });
+});
+
+export {
+  createStudent,
+  getAllStudents,
+  getStudentById,
+  updateStudent,
+  deleteStudent,
+  sendStudentNotice,
+  getStudentNoticeRecipient,
+};

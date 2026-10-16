@@ -16,10 +16,18 @@ import notificationEngine from '../services/notificationEngine.service.js';
 // from the query string, the route params or the request body.
 
 const getStudentNotifications = asyncHandler(async (req, res) => {
+  // Optional `types` filter (comma-separated notification types). Used by the
+  // Student Portal "Fee Reminders" area to read only FEE_REMINDER notifications
+  // from the same inbox - it narrows the principal-scoped query, never widens it.
+  const types = typeof req.query.types === 'string' && req.query.types.trim()
+    ? req.query.types.split(',').map((t) => t.trim()).filter(Boolean)
+    : undefined;
+
   const result = await notificationEngine.listForPrincipal(req.user, {
     page: req.query.page,
     limit: req.query.limit,
     unreadOnly: req.query.unreadOnly,
+    types,
   });
 
   return res.status(200).json({
@@ -30,7 +38,11 @@ const getStudentNotifications = asyncHandler(async (req, res) => {
 });
 
 const getStudentUnreadCount = asyncHandler(async (req, res) => {
-  const result = await notificationEngine.getUnreadCountForPrincipal(req.user);
+  const types = typeof req.query.types === 'string' && req.query.types.trim()
+    ? req.query.types.split(',').map((t) => t.trim()).filter(Boolean)
+    : undefined;
+
+  const result = await notificationEngine.getUnreadCountForPrincipal(req.user, { types });
 
   return res.status(200).json({
     success: true,
@@ -55,7 +67,11 @@ const markStudentNotificationRead = asyncHandler(async (req, res) => {
 });
 
 const markAllStudentNotificationsRead = asyncHandler(async (req, res) => {
-  const result = await notificationEngine.markAllReadForPrincipal(req.user);
+  const types = typeof req.query.types === 'string' && req.query.types.trim()
+    ? req.query.types.split(',').map((t) => t.trim()).filter(Boolean)
+    : undefined;
+
+  const result = await notificationEngine.markAllReadForPrincipal(req.user, { types });
 
   return res.status(200).json({
     success: true,

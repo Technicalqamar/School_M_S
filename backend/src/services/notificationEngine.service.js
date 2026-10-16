@@ -671,7 +671,7 @@ const inboxFilter = (principal) => {
 
 const listForPrincipal = async (actor, filters = {}) => {
   const principal = await requirePrincipal(actor);
-  const { page = 1, limit = 10, unreadOnly, categories } = filters;
+  const { page = 1, limit = 10, unreadOnly, categories, types } = filters;
 
   const filter = inboxFilter(principal);
   if (unreadOnly === true || unreadOnly === 'true' || unreadOnly === '1') {
@@ -679,6 +679,14 @@ const listForPrincipal = async (actor, filters = {}) => {
   }
   if (Array.isArray(categories) && categories.length) {
     filter.category = { $in: categories };
+  }
+  if (Array.isArray(types) && types.length) {
+    const allowedTypes = types
+      .map((t) => String(t).trim().toUpperCase())
+      .filter((t) => NOTIFICATION_TYPE_VALUES.includes(t));
+    if (allowedTypes.length) {
+      filter.type = { $in: allowedTypes };
+    }
   }
 
   const currentPage = Math.max(1, parseInt(page, 10) || 1);
@@ -704,7 +712,7 @@ const listForPrincipal = async (actor, filters = {}) => {
 // Builds the unread filter for a principal. Split out so the same definition
 // backs both the REST unread count and the realtime `notification:unread-count`
 // emissions, keeping the two permanently in agreement.
-const unreadCountFilter = (principal, categories) => {
+const unreadCountFilter = (principal, categories, types) => {
   const filter = {
     ...inboxFilter(principal),
     readBy: { $ne: principal.userId },
@@ -712,11 +720,19 @@ const unreadCountFilter = (principal, categories) => {
   if (Array.isArray(categories) && categories.length) {
     filter.category = { $in: categories };
   }
+  if (Array.isArray(types) && types.length) {
+    const allowedTypes = types
+      .map((t) => String(t).trim().toUpperCase())
+      .filter((t) => NOTIFICATION_TYPE_VALUES.includes(t));
+    if (allowedTypes.length) {
+      filter.type = { $in: allowedTypes };
+    }
+  }
   return filter;
 };
 
-const countUnreadForPrincipal = (principal, categories) =>
-  Notification.countDocuments(unreadCountFilter(principal, categories));
+const countUnreadForPrincipal = (principal, categories, types) =>
+  Notification.countDocuments(unreadCountFilter(principal, categories, types));
 
 // Emits an update to the acting principal's own room(s) and follows it with a
 // freshly recomputed unread count. Only ever addressed to `principal`, so one
@@ -735,7 +751,7 @@ const emitPrincipalNotificationUpdate = async (principal, events = []) => {
 
 const getUnreadCountForPrincipal = async (actor, options = {}) => {
   const principal = await requirePrincipal(actor);
-  const count = await countUnreadForPrincipal(principal, options.categories);
+  const count = await countUnreadForPrincipal(principal, options.categories, options.types);
   return { count };
 };
 
@@ -758,10 +774,11 @@ const markAsReadForPrincipal = async (id, actor) => {
   return mapped;
 };
 
-const markAllReadForPrincipal = async (actor) => {
+const markAllReadForPrincipal = async (actor, options = {}) => {
   const principal = await requirePrincipal(actor);
+  const filter = unreadCountFilter(principal, options.categories, options.types);
   const result = await Notification.updateMany(
-    { ...inboxFilter(principal), readBy: { $ne: principal.userId } },
+    filter,
     { $addToSet: { readBy: principal.userId } },
   );
   await emitPrincipalNotificationUpdate(principal, [

@@ -53,6 +53,8 @@ const DEFAULT_ACADEMIC = {
   allowLeaveMarking: true,
   allowHalfDayLeave: false,
   teacherManualStudentAttendance: false,
+  cameraQrScannerEnabled: true,
+  usbQrScannerEnabled: true,
 };
 
 const DEFAULT_BRANDING = {
@@ -137,6 +139,8 @@ const mapApiToAcademic = (api) => ({
   allowLeaveMarking: api.allowLeaveMarking ?? true,
   allowHalfDayLeave: api.allowHalfDayLeave ?? false,
   teacherManualStudentAttendance: api.teacherManualStudentAttendance ?? false,
+  cameraQrScannerEnabled: api.cameraQrScannerEnabled ?? true,
+  usbQrScannerEnabled: api.usbQrScannerEnabled ?? true,
 });
 
 const mapApiToBranding = (api) => ({
@@ -267,6 +271,8 @@ const SchoolSettings = () => {
         allowLeaveMarking: formData.allowLeaveMarking,
         allowHalfDayLeave: formData.allowHalfDayLeave,
         teacherManualStudentAttendance: formData.teacherManualStudentAttendance,
+        cameraQrScannerEnabled: formData.cameraQrScannerEnabled,
+        usbQrScannerEnabled: formData.usbQrScannerEnabled,
       };
       const res = await schoolSettingsService.updateAcademicSettings(payload);
       setApiSettings(res.data.settings);

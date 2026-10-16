@@ -24,6 +24,12 @@ const getPublicSchoolSettings = asyncHandler(async (req, res) => {
       adminPanelLogo,
       principalName: settings.principalName || '',
       currentAcademicYear: settings.currentAcademicYear || '',
+      // Read-only scanner visibility switches. Attendance pages (including the
+      // receptionist/shared admin shell, which may not hold the School Settings
+      // grant) read these so the administrator's choice is honoured everywhere.
+      // Only admins can change them (PUT /school-settings/academic).
+      cameraQrScannerEnabled: settings.cameraQrScannerEnabled !== false,
+      usbQrScannerEnabled: settings.usbQrScannerEnabled !== false,
     },
   });
 });

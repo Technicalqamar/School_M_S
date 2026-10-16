@@ -1,5 +1,7 @@
 import Teacher from '../models/teacher.model.js';
 import Timetable from '../models/timetable.model.js';
+import AuditLog from '../models/auditLog.model.js';
+import UserAccount from '../models/userAccount.model.js';
 import { ApiError } from '../utils/apiError.js';
 import cloudinary, { configureCloudinary, CLOUDINARY_FOLDERS } from '../config/cloudinary.js';
 import userAccountService from './userAccount.service.js';
@@ -208,7 +210,26 @@ const deleteTeacher = async (teacherId, performedBy) => {
       { $set: { 'periods.$[elem].teacherId': null } },
       { arrayFilters: [{ 'elem.teacherId': existing._id }] },
     ),
+    UserAccount.updateMany(
+      { referenceModel: 'Teacher', referenceId: existing._id },
+      { $set: { isActive: false } },
+    ),
   ]);
+
+  if (performedBy) {
+    await AuditLog.create({
+      action: 'DELETE',
+      module: 'TEACHER',
+      entityId: existing.teacherId,
+      entityType: 'Teacher',
+      performedBy,
+      details: {
+        fullName: existing.fullName,
+        department: existing.department,
+        designation: existing.designation,
+      },
+    });
+  }
 
   return existing;
 };

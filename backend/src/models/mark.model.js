@@ -87,9 +87,16 @@ markSchema.index({ examId: 1, className: 1 });
 markSchema.index({ academicYear: 1 });
 markSchema.index({ studentId: 1 });
 
-markSchema.virtual('isPass').get(function () {
-  return !this.passingMarks || this.obtainedMarks >= this.passingMarks;
-});
+// Pass/fail is deliberately NOT derived from a single Mark document. A Mark has
+// no passing threshold of its own: the threshold lives on the exam-subject
+// configuration (ExamSubject.passingMarks) and is applied by the result services
+// (result.service.js -> buildSubjectResult: `obtainedMarks >= config.passingMarks`),
+// which buildStudentResult/teacherMyResults/studentPortalExam all use.
+//
+// A former `isPass` virtual read `this.passingMarks`, a field the Mark schema has
+// never defined, so it always returned `true` (`!undefined === true`). Nothing
+// consumed it and it was never serialized (mark queries use `.lean()` and no
+// `virtuals: true` is configured), so it only served as a silent trap. Removed.
 
 const Mark = mongoose.model('Mark', markSchema);
 

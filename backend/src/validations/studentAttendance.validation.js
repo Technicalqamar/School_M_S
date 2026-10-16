@@ -120,4 +120,42 @@ const validateGetAttendance = (req, res, next) => {
   next();
 };
 
-export { validateSaveAttendance, validateGetAttendance, validateQrScan };
+// Bulk deletion is only ever honoured when the caller supplies an explicit,
+// valid selector. Empty or "All Classes" selections are rejected when they would
+// leave nothing to filter on, so a request can never resolve to `deleteMany({})`.
+const validateDeleteBulkAttendance = (req, res, next) => {
+  const { className, academicYear, date } = req.query;
+
+  const hasClass =
+    typeof className === 'string' &&
+    className.trim() !== '' &&
+    className.trim() !== 'All Classes';
+  const hasYear = typeof academicYear === 'string' && academicYear.trim() !== '';
+  const hasDate = typeof date === 'string' && date.trim() !== '';
+
+  if (!hasClass && !hasYear && !hasDate) {
+    throw new ApiError(
+      400,
+      'At least one filter (class, academic year, or date) is required to delete attendance records',
+    );
+  }
+
+  if (hasYear && !ACADEMIC_YEAR_REGEX.test(academicYear.trim())) {
+    throw new ApiError(400, 'Invalid academic year format');
+  }
+
+  if (hasClass && !VALID_CLASS_NAMES.includes(className.trim())) {
+    throw new ApiError(400, `Invalid class name. Allowed values: ${VALID_CLASS_NAMES.join(', ')}`);
+  }
+
+  if (hasDate) {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) {
+      throw new ApiError(400, 'Invalid attendance date');
+    }
+  }
+
+  next();
+};
+
+export { validateSaveAttendance, validateGetAttendance, validateQrScan, validateDeleteBulkAttendance };

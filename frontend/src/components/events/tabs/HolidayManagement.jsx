@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from '../../../hooks/useLocalization';
-// import toast from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import {
   ChevronDownIcon, EyeIcon, PencilSquareIcon, TrashIcon,
   XMarkIcon, PlusIcon,

@@ -31,6 +31,8 @@ import dashboardService, { DASHBOARD_EMPTY_DATA } from '../../services/dashboard
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from '../../hooks/useLocalization';
+import { hasModuleAccess } from '../../constants/receptionistPermissions';
+import StudentSearchBar from '../../components/student/StudentSearchBar/StudentSearchBar';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -156,6 +158,12 @@ const AdminDashboard = () => {
           {currentMonthName} {currentYear} · Academic Year {academic?.currentYear || '—'}
         </p>
       </div>
+
+      {hasModuleAccess(user, 'student-management', 'all-students') && (
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-3 sm:p-4">
+          <StudentSearchBar />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4">
         {statCards.map((card) => (

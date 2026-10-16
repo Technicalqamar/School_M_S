@@ -12,7 +12,7 @@ import Modal from '../../common/Modal/Modal';
 import ConfirmationModal from '../../common/ConfirmationModal/ConfirmationModal';
 import Spinner from '../../common/Spinner/Spinner';
 import Button from '../../common/Button/Button';
-import { ACADEMIC_YEARS } from '../../../utils/classNames';
+import { getAcademicYearOptions, resolveCurrentAcademicYear, useAcademicYear } from '../../../utils/academicYear';
 import leaveService from '../../../services/leave/leave.service';
 import studentService from '../../../services/student/student.service';
 import teacherService from '../../../services/teacher/teacher.service';
@@ -188,7 +188,10 @@ const LeaveManagement = () => {
 
   // ── Create form ─────────────────────────────────────────
   const [formType, setFormType] = useState('Student');
-  const [formYear, setFormYear] = useState(academic?.currentYear || '');
+  // Create-form Academic Year defaults to the configured/current year. The only
+  // other year ever offered is the selected person's stored year (see
+  // formYearOptions), so a leave can still be filed for that person's year.
+  const { year: formYear, setYear: setFormYear } = useAcademicYear(academic?.currentYear);
   const [formStatus, setFormStatus] = useState('Pending');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -220,16 +223,23 @@ const LeaveManagement = () => {
   const [confirmAction, setConfirmAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const academicYearOptions = useMemo(() => {
-    const values = new Set([academic?.currentYear, ...ACADEMIC_YEARS].filter(Boolean));
-    return Array.from(values);
-  }, [academic?.currentYear]);
-
-  useEffect(() => {
-    if (academic?.currentYear && !formYear) {
-      setFormYear(academic.currentYear);
-    }
-  }, [academic?.currentYear, formYear]);
+  // ── Academic Year options (School Settings is the source of truth) ──────
+  // Create form: configured year, plus the selected person's stored year when it
+  // differs (a leave must stay on that person's year).
+  const formYearOptions = useMemo(
+    () => getAcademicYearOptions(academic?.currentYear, [formYear, selectedPerson?.academicYear]),
+    [academic?.currentYear, formYear, selectedPerson?.academicYear],
+  );
+  // Edit modal: configured year, plus the year the leave is already stored under.
+  const editYearOptions = useMemo(
+    () => getAcademicYearOptions(academic?.currentYear, [editYear, editSelected?.academicYear]),
+    [academic?.currentYear, editYear, editSelected?.academicYear],
+  );
+  // Filter: configured year, plus every year that exists in the loaded leaves.
+  const filterYearOptions = useMemo(
+    () => getAcademicYearOptions(academic?.currentYear, leaves.map((l) => l.academicYear)),
+    [academic?.currentYear, leaves],
+  );
 
   // ── List loading ────────────────────────────────────────
   const buildFilters = () => ({
@@ -365,7 +375,7 @@ const LeaveManagement = () => {
   // ── Create submit ───────────────────────────────────────
   const resetForm = () => {
     setFormType('Student');
-    setFormYear(academic?.currentYear || '');
+    setFormYear(resolveCurrentAcademicYear(academic?.currentYear));
     setFormStatus('Pending');
     setFromDate('');
     setToDate('');
@@ -678,7 +688,7 @@ const LeaveManagement = () => {
               name="formYear"
               value={formYear}
               onChange={(e) => setFormYear(e.target.value)}
-              options={academicYearOptions}
+              options={formYearOptions}
               placeholder={t('allYears')}
               required
             />
@@ -796,7 +806,7 @@ const LeaveManagement = () => {
               <select value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}
                 className="appearance-none w-full px-3 py-2.5 pr-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
                 <option value="">{t('allYears')}</option>
-                {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                {filterYearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
               <ChevronDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
@@ -1065,7 +1075,7 @@ const LeaveManagement = () => {
                 name="editYear"
                 value={editYear}
                 onChange={(e) => setEditYear(e.target.value)}
-                options={academicYearOptions}
+                options={editYearOptions}
                 placeholder={t('allYears')}
                 required
               />

@@ -71,4 +71,39 @@ const requireActionAccess = (moduleKey, actionKey) => {
   };
 };
 
-export { requireModuleAccess, requireActionAccess };
+// Non-middleware form of `requireActionAccess`, for handlers whose required
+// action is only known at runtime (e.g. the shared QR-scan endpoint, where the
+// action depends on whether the scanned card belongs to a student or a teacher).
+// It performs the exact same role resolution as the middleware - Admins bypass,
+// Receptionists are checked against their stored grants, and every other role is
+// rejected - so authorization can never drift between the two entry points.
+const userHasActionAccess = (req, moduleKey, actionKey) => {
+  const permissions = requireRoleForPermissionCheck(req);
+  if (permissions === null) {
+    return true;
+  }
+
+  return hasActionAccess(permissions, moduleKey, actionKey);
+};
+
+// Guard that admits an actor holding ANY of the listed actions. Used by endpoints
+// whose exact action is only known after the request is inspected by the handler
+// (the shared QR-scan route); it still fails closed for roles that may not use
+// the endpoint at all, keeping the permission check ahead of body validation.
+const requireAnyActionAccess = (moduleKey, actionKeys) => {
+  return (req, res, next) => {
+    const permissions = requireRoleForPermissionCheck(req);
+    if (permissions === null) {
+      return next();
+    }
+
+    const allowed = actionKeys.some((actionKey) => hasActionAccess(permissions, moduleKey, actionKey));
+    if (!allowed) {
+      throw new ApiError(403, 'You do not have permission to perform this action');
+    }
+
+    return next();
+  };
+};
+
+export { requireModuleAccess, requireActionAccess, userHasActionAccess, requireAnyActionAccess };

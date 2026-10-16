@@ -2,6 +2,7 @@ import Student from '../models/student.model.js';
 import StudentPromotion from '../models/studentPromotion.model.js';
 import AuditLog from '../models/auditLog.model.js';
 import SchoolSettings from '../models/schoolSettings.model.js';
+import UserAccount from '../models/userAccount.model.js';
 import { ApiError } from '../utils/apiError.js';
 import cloudinary, { configureCloudinary, CLOUDINARY_FOLDERS } from '../config/cloudinary.js';
 import classValidation from './classValidation.service.js';
@@ -10,6 +11,7 @@ import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
   NOTIFICATION_CATEGORIES,
+  NOTIFICATION_SOURCES,
 } from '../constants/notification.constants.js';
 import userAccountService from './userAccount.service.js';
 import defaultPasswordService from './defaultPassword.service.js';
@@ -356,6 +358,10 @@ const deleteStudent = async (studentId, performedBy) => {
   await Promise.all([
     Student.deleteOne({ studentId }),
     StudentPromotion.deleteMany({ studentId: existing._id }),
+    UserAccount.updateMany(
+      { referenceModel: 'Student', referenceId: existing._id },
+      { $set: { isActive: false } },
+    ),
   ]);
 
   if (performedBy) {
@@ -376,4 +382,105 @@ const deleteStudent = async (studentId, performedBy) => {
   return existing;
 };
 
-export default { createStudent, getAllStudents, getStudentById, updateStudent, deleteStudent };
+// Categories the Single Student Management notice form may send. They are a
+// display-level label only (the stored notification stays a manual,
+// `General`-category message), so they never widen what the engine accepts.
+const STUDENT_NOTICE_TYPES = ['General', 'Fee Reminder', 'Attendance Reminder', 'Exam Reminder'];
+
+// Sends one in-app notice/reminder to exactly one student's portal inbox.
+//
+// The recipient is NEVER taken from the request: it is resolved from the
+// `studentId` in the route, which the caller is already authorized to act on
+// (the route is Admin-only). Delivery is refused unless the student is active
+// and has an active portal account, because the in-app notification is the only
+// operational single-recipient channel here - there is no external SMS provider
+// wired in, so the server must not pretend a message was sent. The engine still
+// re-resolves and authorizes the recipient, addresses exactly one Notification
+// document, and emits it only to that one principal's socket room.
+const sendStudentNotice = async (studentId, payload = {}, performedBy) => {
+  const student = await Student.findOne({ studentId });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found');
+  }
+
+  if (student.status && student.status !== 'Active') {
+    throw new ApiError(400, 'This student is inactive. Reactivate the student before sending a notice.');
+  }
+
+  const account = await UserAccount.findOne({
+    referenceId: student._id,
+    referenceModel: 'Student',
+    isActive: true,
+  }).select('_id');
+
+  if (!account) {
+    throw new ApiError(
+      400,
+      'This student has no active portal account yet, so an in-app notice cannot be delivered. Open the student portal first, then try again.',
+    );
+  }
+
+  const noticeType = STUDENT_NOTICE_TYPES.includes(payload.type) ? payload.type : 'General';
+  const title = String(payload.title || '').trim() || noticeType;
+  const message = String(payload.message || '').trim();
+
+  const { notification, created } = await notificationEngine.createNotification({
+    title,
+    message,
+    // Single, server-resolved recipient. No audience/classNames are supplied, so
+    // this can never fan out to a class or the whole school.
+    recipient: { role: 'student', profileId: student._id },
+    actor: performedBy,
+    dedupe: false,
+    source: NOTIFICATION_SOURCES.MANUAL,
+    type: noticeType === 'Fee Reminder' ? NOTIFICATION_TYPES.FEE_REMINDER : undefined,
+  });
+
+  return {
+    notification,
+    created,
+    recipient: {
+      studentId: student.studentId,
+      fullName: student.fullName,
+      className: student.class,
+      guardianName: student.fatherName || '',
+      guardianPhone: student.fatherPhone || student.alternatePhone || '',
+      channel: 'In-app notification (student portal)',
+    },
+  };
+};
+
+const getStudentNoticeRecipient = async (studentId) => {
+  const student = await Student.findOne({ studentId });
+
+  if (!student) {
+    throw new ApiError(404, 'Student not found');
+  }
+
+  const account = await UserAccount.findOne({
+    referenceId: student._id,
+    referenceModel: 'Student',
+    isActive: true,
+  }).select('_id');
+
+  return {
+    studentId: student.studentId,
+    fullName: student.fullName,
+    className: student.class,
+    guardianName: student.fatherName || '',
+    guardianPhone: student.fatherPhone || student.alternatePhone || '',
+    hasPortalAccount: Boolean(account),
+    channel: account ? 'In-app notification (student portal)' : null,
+  };
+};
+
+export default {
+  createStudent,
+  getAllStudents,
+  getStudentById,
+  updateStudent,
+  deleteStudent,
+  sendStudentNotice,
+  getStudentNoticeRecipient,
+};

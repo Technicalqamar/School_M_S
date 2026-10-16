@@ -1,5 +1,6 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { RECEPTIONIST_BASE_PATH } from '../constants/receptionistPermissions';
 
 // Route-level guard for Admin-only pages inside the shared /admin tree
 // (currently the "Receptionist Management" module). Any non-admin - including a
@@ -8,10 +9,13 @@ import { useAuth } from '../contexts/AuthContext';
 // this is UX mirroring of a server-side rule.
 const RequireAdmin = ({ children }) => {
   const { user, role, loading } = useAuth();
+  const { pathname } = useLocation();
+  // Stay inside the namespace the user is already in (Admin vs Receptionist).
+  const base = pathname.startsWith(RECEPTIONIST_BASE_PATH) ? RECEPTIONIST_BASE_PATH : '/admin';
 
   if (loading) return null;
-  if (!user) return <Navigate to="/admin/login" replace />;
-  if (role !== 'admin') return <Navigate to="/admin/access-denied" replace />;
+  if (!user) return <Navigate to={`${base}/login`} replace />;
+  if (role !== 'admin') return <Navigate to={`${base}/access-denied`} replace />;
   return children;
 };
 

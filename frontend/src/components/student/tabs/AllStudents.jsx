@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from '../../../hooks/useLocalization';
 import { useAuth } from '../../../contexts/AuthContext';
 import { hasReceptionistActionAccess } from '../../../constants/receptionistPermissions';
@@ -27,6 +27,10 @@ const AllStudents = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const location = useLocation();
+  // Open the profile in whichever portal namespace we are in
+  // (`/admin` or `/receptionist`).
+  const base = location.pathname.startsWith('/receptionist') ? '/receptionist' : '/admin';
 
   // Per-action student capabilities: viewing, editing and deleting are granted
   // separately. Admins always pass; a receptionist needs the exact action
@@ -213,7 +217,7 @@ const AllStudents = () => {
         <div className="flex items-center justify-end gap-1.5">
           <ActionButtons
             onView={canStudent('student-view')
-              ? () => navigate(`/admin/students/${student.studentId}`, { state: { student } })
+              ? () => navigate(`${base}/students/${student.studentId}`, { state: { student } })
               : undefined}
             onEdit={canStudent('student-edit') ? () => setEditingStudent(student) : undefined}
             onDelete={canStudent('student-delete') ? () => setDeletingStudent(student) : undefined}
@@ -392,7 +396,7 @@ const AllStudents = () => {
                       key={student.studentId}
                       student={student}
                       onView={canStudent('student-view')
-                        ? () => navigate(`/admin/students/${student.studentId}`, { state: { student } })
+                        ? () => navigate(`${base}/students/${student.studentId}`, { state: { student } })
                         : undefined}
                       onEdit={canStudent('student-edit') ? () => setEditingStudent(student) : undefined}
                       onDelete={canStudent('student-delete') ? () => setDeletingStudent(student) : undefined}

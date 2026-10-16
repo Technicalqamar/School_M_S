@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from '../../hooks/useLocalization';
 import {
@@ -19,7 +19,7 @@ import {
   classAudienceEnabled,
 } from '../../utils/communicationUtils';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
-import { ACADEMIC_YEARS } from '../../utils/classNames';
+import { getAcademicYearOptions, resolveCurrentAcademicYear } from '../../utils/academicYear';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasReceptionistActionAccess } from '../../constants/receptionistPermissions';
 
@@ -58,9 +58,17 @@ const Notices = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ ...initialForm, academicYear: academic.currentYear || '' });
+  const [form, setForm] = useState({ ...initialForm, academicYear: resolveCurrentAcademicYear(academic?.currentYear) });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Academic Year (School Settings is the source of truth). A normal notice only
+  // offers the configured year — plus the stored year of the notice being edited,
+  // so an older notice keeps its own year.
+  const academicYearOptions = useMemo(
+    () => getAcademicYearOptions(academic?.currentYear, [form.academicYear]),
+    [academic?.currentYear, form.academicYear],
+  );
 
   const [viewNotice, setViewNotice] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -105,7 +113,7 @@ const Notices = () => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...initialForm, academicYear: academic.currentYear || '' });
+    setForm({ ...initialForm, academicYear: resolveCurrentAcademicYear(academic?.currentYear) });
     setFormError('');
     setFormOpen(true);
   };
@@ -118,7 +126,7 @@ const Notices = () => {
       audience: notice.audience || 'All',
       classNames: notice.classNames || [],
       status: notice.status || 'Draft',
-      academicYear: notice.academicYear || academic.currentYear || '',
+      academicYear: notice.academicYear || resolveCurrentAcademicYear(academic?.currentYear),
     });
     setFormError('');
     setFormOpen(true);
@@ -417,7 +425,7 @@ const Notices = () => {
               onChange={(e) => handleFieldChange('academicYear', e.target.value)}
               className="appearance-none w-full px-4 py-2.5 pr-8 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
             >
-              {ACADEMIC_YEARS.map((y) => (
+              {academicYearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>

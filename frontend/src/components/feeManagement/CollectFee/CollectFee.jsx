@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { MagnifyingGlassIcon, CheckCircleIcon, CurrencyRupeeIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, CheckCircleIcon, CurrencyRupeeIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import Table from '../../common/Table/Table';
 import Button from '../../common/Button/Button';
@@ -51,7 +51,12 @@ const StudentAvatar = ({ name, className: cls }) => (
   </div>
 );
 
-const CollectFee = ({ onDataChange }) => {
+// Collect Fee is the project's single fee-collection workflow. It normally
+// renders a search + results table, but the Single Student Management workspace
+// reuses the very same component in "embedded" mode: pass the already-selected
+// `preselectedStudent` and it shows just that student with a Collect Fee button,
+// so there is exactly one collection form, one validation path and one receipt.
+const CollectFee = ({ onDataChange, preselectedStudent = null }) => {
   const { academic } = useSchoolConfig();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -301,6 +306,76 @@ const CollectFee = ({ onDataChange }) => {
     }
   };
 
+  // Print the just-issued receipt through a dedicated window, so only the
+  // receipt is printed (never the surrounding app). Built from the same
+  // `receiptData` the on-screen receipt shows, so the figures always match.
+  const handlePrintReceipt = () => {
+    if (!receiptData) return;
+
+    const esc = (value) =>
+      String(value ?? '').replace(/[&<>"]/g, (char) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]
+      ));
+
+    const row = (label, value) => `<div class="row"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=700');
+    if (!printWindow) {
+      toast.error('Popup blocked. Allow pop-ups to print the receipt.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt ${esc(receiptData.id || '')}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', Courier, monospace; width: 280px; margin: 0 auto; padding: 10px 12px; color: #000; background: #fff; }
+          .center { text-align: center; }
+          h1 { font-size: 15px; letter-spacing: 1px; }
+          .muted { font-size: 11px; color: #444; }
+          .section { border-top: 1px dashed #999; margin-top: 8px; padding-top: 8px; font-size: 12px; }
+          .row { display: flex; justify-content: space-between; padding: 2px 0; gap: 8px; }
+          .row span:last-child { text-align: right; }
+          .total { font-weight: bold; border-top: 1px dashed #999; margin-top: 4px; padding-top: 4px; }
+          .thanks { text-align: center; font-size: 11px; margin-top: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <h1>FEE RECEIPT</h1>
+          <p class="muted">Receipt #${esc(receiptData.id)}</p>
+          <p class="muted">${esc(receiptData.date)}</p>
+        </div>
+        <div class="section">
+          ${row('Student', receiptData.studentName)}
+          ${row('Father', receiptData.fatherName)}
+          ${row('Student ID', receiptData.studentId)}
+          ${row('Class', receiptData.className)}
+        </div>
+        <div class="section">
+          ${row('Payment Type', receiptData.feeType)}
+          ${row('Month', receiptData.month)}
+          ${receiptData.exam ? row('Exam', receiptData.exam) : ''}
+          ${row('Original Fee', formatCurrency(receiptData.feeAmount))}
+          ${receiptData.discount > 0 ? row('Discount', `- ${formatCurrency(receiptData.discount)}`) : ''}
+          ${receiptData.fine > 0 ? row('Fine', `+ ${formatCurrency(receiptData.fine)}`) : ''}
+          ${row('Total Payable', formatCurrency(receiptData.totalPayable))}
+          <div class="row total"><span>Amount Paid</span><span>${esc(formatCurrency(receiptData.amountPaid))}</span></div>
+          ${row('Remaining', formatCurrency(receiptData.remainingAmount))}
+          ${row('Payment Method', receiptData.paymentMethod)}
+        </div>
+        <p class="thanks">Thank you!</p>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
+  };
+
   const tableColumns = [
     { key: 'name', label: 'Student Name' },
     { key: 'fatherName', label: 'Father Name' },
@@ -335,6 +410,29 @@ const CollectFee = ({ onDataChange }) => {
 
   return (
     <div className="space-y-6">
+      {preselectedStudent && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <StudentAvatar name={preselectedStudent.fullName} className="w-11 h-11 text-sm bg-gradient-to-br from-blue-600 to-blue-800" />
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-white">{preselectedStudent.fullName}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                {preselectedStudent.studentId} · {preselectedStudent.class}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openCollectModal(mapStudentResult(preselectedStudent))}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all cursor-pointer shadow-sm whitespace-nowrap"
+          >
+            <CurrencyRupeeIcon className="h-4 w-4" />
+            Collect Fee
+          </button>
+        </div>
+      )}
+
+      {!preselectedStudent && (
+      <>
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Collect Fee</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -389,6 +487,8 @@ const CollectFee = ({ onDataChange }) => {
         )}
         <Table columns={tableColumns} data={searchResults} renderRow={renderRow} />
       </div>
+      </>
+      )}
 
       <Modal isOpen={showModal} onClose={closeModal} title="Collect Fee" maxWidth="max-w-2xl">
         {selectedStudent && (
@@ -620,9 +720,17 @@ const CollectFee = ({ onDataChange }) => {
               </div>
             </div>
 
-            <Button variant="secondary" onClick={() => { setShowReceiptModal(false); setReceiptData(null); }}>
-              Close
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={handlePrintReceipt} className="flex-1">
+                <span className="inline-flex items-center justify-center gap-2">
+                  <PrinterIcon className="h-4 w-4" />
+                  Print Receipt
+                </span>
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowReceiptModal(false); setReceiptData(null); }} className="flex-1">
+                Close
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

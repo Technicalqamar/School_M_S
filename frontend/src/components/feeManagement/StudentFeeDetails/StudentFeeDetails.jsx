@@ -1,12 +1,21 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { MagnifyingGlassIcon, PrinterIcon, UserIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PrinterIcon, ArrowDownTrayIcon, UserIcon, CurrencyDollarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import Table from '../../common/Table/Table';
 import Button from '../../common/Button/Button';
 import Modal from '../../common/Modal/Modal';
+import DateInput from '../../common/DateInput/DateInput';
 import feeService from '../../../services/fee/fee.service';
 import studentService from '../../../services/student/student.service';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import {
+  REPORT_MODES,
+  MONTH_NAMES,
+  resolveReportRange,
+  validateReportRange,
+  buildReportPeriodLabel,
+  getMonthRange,
+} from '../../../utils/singleStudentActions';
 
 const FEE_TYPES = ['All Fee Types', 'Monthly Fee', 'Admission Fee', 'Examination Fee'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -78,13 +87,27 @@ const mapPaymentRow = (p) => ({
   className: p.className,
 });
 
-const StudentFeeDetails = () => {
+const StudentFeeDetails = ({ student = null }) => {
   const { schoolInfo, branding, academic } = useSchoolConfig();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [foundStudent, setFoundStudent] = useState(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [foundStudent, setFoundStudent] = useState(student ? buildStudentCard(student) : null);
+  const [hasSearched, setHasSearched] = useState(Boolean(student));
   const [searching, setSearching] = useState(false);
+
+  // When the Single Student Management workspace hands in the already-selected
+  // student, the search surface is bypassed and this component shows (and
+  // prints) that exact student's fee record. The reference is only replaced when
+  // the id actually changes, so the payment fetches below are not re-run on
+  // every render and never fall back to a different student.
+  const embedded = Boolean(student);
+
+  useEffect(() => {
+    if (!student) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFoundStudent((prev) => (prev && prev._id === student._id ? prev : buildStudentCard(student)));
+    setHasSearched(true);
+  }, [student]);
 
   const [studentPayments, setStudentPayments] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -96,6 +119,20 @@ const StudentFeeDetails = () => {
   const [monthFilter, setMonthFilter] = useState('All Months');
   const [yearFilter, setYearFilter] = useState('All Years');
   const [inputFocused, setInputFocused] = useState(false);
+
+  // Payment-date period for the report. `all` (default) keeps the full payment
+  // history visible; `month` and `custom` filter by the date each payment was
+  // actually collected. The outstanding/dues figures are derived separately
+  // below, so a payment window can never hide an outstanding fee.
+  const [reportMode, setReportMode] = useState('all');
+  const [reportMonth, setReportMonth] = useState(String(new Date().getMonth()));
+  // Default to the same academic year the picker offers, so the month-mode
+  // selects always open on a valid option.
+  const [reportYear, setReportYear] = useState(() => (
+    /^\d{4}$/.test(academic?.currentYear || '') ? academic.currentYear : String(new Date().getFullYear())
+  ));
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo, setReportTo] = useState('');
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptItem, setReceiptItem] = useState(null);
@@ -243,6 +280,22 @@ const StudentFeeDetails = () => {
     if (feeTypeFilter !== 'All Fee Types') params.feeType = feeTypeFilter;
     if (monthFilter !== 'All Months') params.month = monthFilter;
 
+    // Apply the payment-date period. An incomplete/invalid custom range simply
+    // fetches nothing — the UI shows the validation message instead of silently
+    // falling back to every payment.
+    if (reportMode !== 'all') {
+      const range = reportMode === 'month'
+        ? getMonthRange(Number(reportYear), Number(reportMonth))
+        : resolveReportRange(REPORT_MODES.CUSTOM, { from: reportFrom, to: reportTo });
+
+      if (!range) {
+        return undefined;
+      }
+
+      params.fromDate = range.from;
+      params.toDate = range.to;
+    }
+
     feeService.getStudentPayments(params)
       .then((res) => {
         if (cancelled) return;
@@ -256,7 +309,30 @@ const StudentFeeDetails = () => {
       });
 
     return () => { cancelled = true; };
-  }, [foundStudent, yearFilter, feeTypeFilter, monthFilter]);
+  }, [foundStudent, yearFilter, feeTypeFilter, monthFilter, reportMode, reportMonth, reportYear, reportFrom, reportTo]);
+
+  // Validation + labels for the payment-date period.
+  const reportRangeError = reportMode === 'custom'
+    ? validateReportRange(reportFrom, reportTo)
+    : '';
+
+  const reportPeriodLabel = reportMode === 'all'
+    ? 'All time'
+    : buildReportPeriodLabel(reportMode, {
+        year: reportYear,
+        monthIndex: Number(reportMonth),
+        from: reportFrom,
+        to: reportTo,
+      });
+
+  const selectReportMode = (mode) => {
+    setReportMode(mode);
+    if (mode === 'custom' && (!reportFrom || !reportTo)) {
+      const range = getMonthRange(Number(reportYear), Number(reportMonth));
+      setReportFrom(range?.from || '');
+      setReportTo(new Date().toLocaleDateString('en-CA'));
+    }
+  };
 
   const feeLines = useMemo(() => {
     const lines = new Map();
@@ -362,6 +438,152 @@ const StudentFeeDetails = () => {
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
   };
 
+  // Full, print-friendly fee record for the student currently in view. Built
+  // from the same data the on-screen record uses — the summary/dues always cover
+  // the whole account, while the payment table reflects the selected payment
+  // period — and printed/PDF'd through a dedicated surface so the app chrome is
+  // never included.
+  const escapeFeeHtml = (value) =>
+    String(value ?? '').replace(/[&<>"]/g, (char) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]
+    ));
+
+  const FEE_REPORT_CSS = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; padding: 24px; }
+    h1 { font-size: 20px; margin-bottom: 2px; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .section { margin-top: 16px; }
+    .section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; margin-bottom: 6px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 12px; }
+    .grid .label { color: #6b7280; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f3f4f6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #374151; }
+    .num { text-align: right; }
+    .totals { margin-top: 12px; font-size: 12px; }
+    .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
+    @media print { body { padding: 0; } }`;
+
+  const buildFeeReportBodyHtml = () => {
+    const esc = escapeFeeHtml;
+
+    const summaryRows = [
+      ['Yearly Fee', monthlyTotal, monthlyPaid, monthlyDue],
+      ['Admission Fee', admissionTotal, admissionPaid, admissionDue],
+      ['Exam Fee', examTotal, examPaid, examDue],
+    ].map(([label, total, paid, due]) => `
+      <tr>
+        <td>${esc(label)}</td>
+        <td class="num">${esc(formatCurrency(total))}</td>
+        <td class="num">${esc(formatCurrency(paid))}</td>
+        <td class="num">${esc(formatCurrency(due))}</td>
+      </tr>`).join('');
+
+    const paymentRows = paymentHistory.map((p) => `
+      <tr>
+        <td>${esc(p.id)}</td>
+        <td>${esc(p.date)}</td>
+        <td>${esc(p.feeType)}</td>
+        <td>${esc([p.month, p.exam].filter(Boolean).join(' / ') || '-')}</td>
+        <td class="num">${esc(formatCurrency(p.amount))}</td>
+        <td class="num">${esc(formatCurrency(p.discount))}</td>
+        <td class="num">${esc(formatCurrency(p.fine))}</td>
+        <td class="num">${esc(formatCurrency(p.totalPaid))}</td>
+        <td>${esc(p.status)}</td>
+      </tr>`).join('');
+
+    const filterBits = [];
+    if (feeTypeFilter !== 'All Fee Types') filterBits.push(`Fee Type: ${esc(feeTypeFilter)}`);
+    if (monthFilter !== 'All Months') filterBits.push(`Fee Month: ${esc(monthFilter)}`);
+    if (yearFilter !== 'All Years') filterBits.push(`Academic Year: ${esc(yearFilter)}`);
+    filterBits.push(`Payment Period: ${esc(reportPeriodLabel || 'All time')}`);
+
+    return `
+      <h1>${esc(schoolInfo.name || 'School')}</h1>
+      <p class="muted">${esc([schoolInfo.address, schoolInfo.city].filter(Boolean).join(', '))}</p>
+      <p class="muted">Student Fee Report${academic?.currentYear ? ` · Academic Year ${esc(academic.currentYear)}` : ''}</p>
+
+      <div class="section">
+        <h2>Student Information</h2>
+        <div class="grid">
+          <div><span class="label">Name:</span> ${esc(foundStudent.name)}</div>
+          <div><span class="label">Student ID:</span> ${esc(foundStudent.id)}</div>
+          <div><span class="label">Father:</span> ${esc(foundStudent.fatherName)}</div>
+          <div><span class="label">Class:</span> ${esc(foundStudent.class)}</div>
+          <div><span class="label">Gender:</span> ${esc(foundStudent.gender)}</div>
+          <div><span class="label">Admission Date:</span> ${esc(foundStudent.admissionDate)}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Fee Summary</h2>
+        <table>
+          <thead><tr><th>Fee Type</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Remaining</th></tr></thead>
+          <tbody>${summaryRows}</tbody>
+        </table>
+        <div class="totals">
+          <div><span>Total Paid</span><strong>${esc(formatCurrency(totalPaid))}</strong></div>
+          <div><span>Total Remaining</span><strong>${esc(formatCurrency(totalRemaining))}</strong></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Payment History</h2>
+        <p class="muted">${filterBits.join(' &nbsp;|&nbsp; ')}</p>
+        <table>
+          <thead><tr><th>Receipt</th><th>Date</th><th>Fee Type</th><th>Month / Exam</th><th class="num">Amount</th><th class="num">Discount</th><th class="num">Fine</th><th class="num">Paid</th><th>Status</th></tr></thead>
+          <tbody>${paymentRows || '<tr><td colspan="9" class="muted">No payments recorded for this period.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const handlePrintFeeRecord = () => {
+    if (!foundStudent) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Popup blocked. Allow pop-ups to print the fee record.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fee Report - ${escapeFeeHtml(foundStudent.name || foundStudent.id || '')}</title>
+        <style>${FEE_REPORT_CSS}</style>
+      </head>
+      <body>${buildFeeReportBodyHtml()}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
+  };
+
+  // Reuses the project's existing html2pdf dependency to download the same
+  // filtered fee report as a PDF.
+  const handleDownloadFeeReportPdf = async () => {
+    if (!foundStudent) return;
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
+      const el = document.createElement('div');
+      el.innerHTML = `<style>${FEE_REPORT_CSS}</style>${buildFeeReportBodyHtml()}`;
+      document.body.appendChild(el);
+      await html2pdf().set({
+        margin: [8, 8, 8, 8],
+        filename: `Fee-Report-${foundStudent.id || 'student'}-${reportPeriodLabel || 'all'}.pdf`.replace(/\s+/g, '-'),
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      }).from(el).save();
+      document.body.removeChild(el);
+    } catch {
+      toast.error('Could not generate the PDF. Use Print Fee Record instead.');
+    }
+  };
+
   const getShowMonth = () => feeTypeFilter === 'All Fee Types' || feeTypeFilter === 'Monthly Fee' || feeTypeFilter === 'Admission Fee';
   const getShowExam = () => feeTypeFilter === 'All Fee Types' || feeTypeFilter === 'Examination Fee';
 
@@ -428,13 +650,16 @@ const StudentFeeDetails = () => {
 
   return (
     <div className="space-y-4">
+      {!embedded && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Student Fee Details</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Search for a student to view their complete fee details and payment history</p>
         </div>
       </div>
+      )}
 
+      {!embedded && (
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-3 max-w-lg">
           <div className="relative flex-1">
@@ -483,6 +708,7 @@ const StudentFeeDetails = () => {
           </button>
         </div>
       </div>
+      )}
 
       {hasSearched && !foundStudent && searchResults.length === 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -493,6 +719,23 @@ const StudentFeeDetails = () => {
 
       {foundStudent && (
         <>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={handlePrintFeeRecord}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print Fee Report
+            </button>
+            <button
+              onClick={handleDownloadFeeReportPdf}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              Download PDF
+            </button>
+          </div>
+
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-4">
               <UserIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -680,7 +923,7 @@ const StudentFeeDetails = () => {
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Payment History</h3>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="flex flex-wrap gap-3 mb-3">
               <select
                 value={feeTypeFilter}
                 onChange={(e) => setFeeTypeFilter(e.target.value)}
@@ -708,9 +951,68 @@ const StudentFeeDetails = () => {
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
+              <select
+                aria-label="Payment period"
+                value={reportMode}
+                onChange={(e) => selectReportMode(e.target.value)}
+                className="px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">All Payment Dates</option>
+                <option value={REPORT_MODES.MONTH}>By Month</option>
+                <option value={REPORT_MODES.CUSTOM}>Custom Date Range</option>
+              </select>
             </div>
 
-            {paymentsLoading ? (
+            {reportMode === REPORT_MODES.MONTH && (
+              <div className="flex flex-wrap gap-3 mb-4 max-w-md">
+                <select
+                  aria-label="Payment month"
+                  value={reportMonth}
+                  onChange={(e) => setReportMonth(e.target.value)}
+                  className="px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+                >
+                  {MONTH_NAMES.map((name, index) => (
+                    <option key={name} value={String(index)}>{name}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Payment year"
+                  value={reportYear}
+                  onChange={(e) => setReportYear(e.target.value)}
+                  className="px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+                >
+                  {yearOptions.filter((y) => /^\d{4}$/.test(y)).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {reportMode === REPORT_MODES.CUSTOM && (
+              <div className="flex flex-wrap gap-3 mb-4 max-w-md">
+                <DateInput
+                  label="From"
+                  name="reportFrom"
+                  value={reportFrom}
+                  onChange={(e) => setReportFrom(e.target.value)}
+                />
+                <DateInput
+                  label="To"
+                  name="reportTo"
+                  value={reportTo}
+                  onChange={(e) => setReportTo(e.target.value)}
+                />
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Showing payments collected in <span className="font-medium text-gray-700 dark:text-gray-200">{reportPeriodLabel || 'All time'}</span>.
+              Outstanding dues below are always shown in full and are not affected by this payment period.
+            </p>
+
+            {reportRangeError ? (
+              <p className="text-sm text-red-600 dark:text-red-400 py-6 text-center">{reportRangeError}</p>
+            ) : paymentsLoading ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">Loading payment history...</p>
             ) : (
               <Table columns={paymentColumns} data={paymentHistory} renderRow={renderPaymentRow} />

@@ -13,6 +13,7 @@ import {
   BanknotesIcon,
   ClockIcon,
   BellIcon,
+  BellAlertIcon,
   MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +26,12 @@ import studentDashboardService, { STUDENT_DASHBOARD_EMPTY_DATA } from '../../ser
 import studentFeesService from '../../services/student/studentFees.service';
 import studentNoticesService from '../../services/student/studentNotices.service';
 import studentNotificationsService from '../../services/student/studentNotifications.service';
+
+// Fee reminders are ordinary Notification Engine records of type FEE_REMINDER.
+// A stable module-level array (never an inline literal) keeps the fetch effect
+// from re-running on every render, exactly like the portal Fee Reminders page.
+const FEE_REMINDER_TYPES = ['FEE_REMINDER'];
+const REMINDER_PREVIEW_LIMIT = 3;
 
 const StudentDashboard = ({ portalContext }) => {
   const { user: authUser } = useAuth();
@@ -43,6 +50,16 @@ const StudentDashboard = ({ portalContext }) => {
   const [feeOverview, setFeeOverview] = useState(null);
   const [feeLoading, setFeeLoading] = useState(true);
   const [feeLoadFailed, setFeeLoadFailed] = useState(false);
+
+  // Fee Reminders — the same recipient-scoped Notification Engine records the
+  // Notifications page and the header Bell already show, narrowed to the
+  // FEE_REMINDER type. Read straight from the existing endpoints: no second inbox,
+  // no second reminder and no fabricated data, so read/unread state and the unread
+  // count stay identical to the rest of the portal.
+  const [reminders, setReminders] = useState([]);
+  const [reminderUnread, setReminderUnread] = useState(0);
+  const [remindersLoading, setRemindersLoading] = useState(true);
+  const [remindersFailed, setRemindersFailed] = useState(false);
 
   const fetchDashboard = () =>
     studentDashboardService
@@ -72,10 +89,44 @@ const StudentDashboard = ({ portalContext }) => {
         setFeeLoading(false);
       });
 
+  // No synchronous setState here: the effect and the retry handler both call it
+  // and every state update happens in the promise callbacks.
+  const fetchReminders = () =>
+    Promise.all([
+      studentNotificationsService.getNotifications({
+        page: 1,
+        limit: REMINDER_PREVIEW_LIMIT,
+        types: FEE_REMINDER_TYPES,
+      }),
+      studentNotificationsService.getUnreadCount({ types: FEE_REMINDER_TYPES }),
+    ])
+      .then(([list, count]) => {
+        setReminders(list.notifications);
+        setReminderUnread(count);
+        setRemindersFailed(false);
+      })
+      .catch(() => {
+        setRemindersFailed(true);
+      })
+      .finally(() => {
+        setRemindersLoading(false);
+      });
+
   useEffect(() => {
     fetchDashboard();
     fetchFeeOverview();
+    fetchReminders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the section in step with the Bell and the Notifications page: both
+  // emit a change after a mark-as-read (and a realtime push does too), so the
+  // dashboard re-reads its own slice of the same inbox rather than caching.
+  useEffect(() => {
+    const unsubscribe = studentNotificationsService.subscribe(() => {
+      fetchReminders();
+    });
+    return unsubscribe;
   }, []);
 
   const retry = () => {
@@ -90,6 +141,30 @@ const StudentDashboard = ({ portalContext }) => {
     setFeeLoading(true);
     setFeeOverview(null);
     fetchFeeOverview();
+  };
+
+  const retryReminders = () => {
+    setRemindersFailed(false);
+    setRemindersLoading(true);
+    fetchReminders();
+  };
+
+  // Marks one reminder read through the ordinary endpoint, then updates this
+  // card locally for instant feedback. The endpoint also emits a change, so the
+  // Bell, the Notifications page and this card all settle on the same state.
+  const handleReminderRead = (reminder) => {
+    if (!reminder || reminder.read) return;
+    studentNotificationsService
+      .markAsRead(reminder.id)
+      .then(() => {
+        setReminders((prev) =>
+          prev.map((item) => (item.id === reminder.id ? { ...item, read: true } : item)),
+        );
+        setReminderUnread((prev) => Math.max(0, prev - 1));
+      })
+      .catch(() => {
+        toast.error(t('feeRemindersLoadError') || 'Failed to update reminder');
+      });
   };
 
   const liveData = data;
@@ -133,6 +208,19 @@ const StudentDashboard = ({ portalContext }) => {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const formatCurrency = (value) =>
@@ -389,6 +477,91 @@ const StudentDashboard = ({ portalContext }) => {
               )}
             </>
           )}
+      </section>
+
+      {/* Fee reminders — the recipient-scoped FEE_REMINDER notifications already
+          visible in the Notifications page and the header Bell, surfaced on the
+          account home too. Same records, same read/unread state, no duplicate. */}
+      <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400">
+            <BellAlertIcon className="h-5 w-5" />
+          </div>
+          <h2 className="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider min-w-0">
+            {t('feeReminders')}
+          </h2>
+          {reminderUnread > 0 && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+              {reminderUnread}
+            </span>
+          )}
+          <Link
+            to={portalLink('/fee-reminders')}
+            className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            {t('view')} <ArrowRightIcon className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {remindersLoading && (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-orange-500" />
+            {t('loadingData')}
+          </div>
+        )}
+
+        {!remindersLoading && remindersFailed && (
+          <SectionError message={t('feeRemindersLoadError')} onRetry={retryReminders} />
+        )}
+
+        {!remindersLoading && !remindersFailed && reminders.length === 0 && (
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-700/40 border border-dashed border-gray-200 dark:border-gray-600 px-4 py-6 text-center">
+            <BellAlertIcon className="h-7 w-7 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('noFeeReminders')}</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('feeRemindersSubtitle')}</p>
+          </div>
+        )}
+
+        {!remindersLoading && !remindersFailed && reminders.length > 0 && (
+          <div className="space-y-3">
+            {reminders.map((reminder) => (
+              <div
+                key={reminder.id}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 min-w-0 break-words">
+                    {reminder.title || t('feeReminders')}
+                  </p>
+                  {!reminder.read && (
+                    <span
+                      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-orange-500"
+                      title={t('unread')}
+                    />
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
+                  {reminder.message}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                    <ClockIcon className="h-3.5 w-3.5" />
+                    {formatDateTime(reminder.time)}
+                  </p>
+                  {!reminder.read && (
+                    <button
+                      type="button"
+                      onClick={() => handleReminderRead(reminder)}
+                      className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {t('markAsRead')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Homework + Examinations summaries */}

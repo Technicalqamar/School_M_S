@@ -25,6 +25,24 @@ const studentService = {
     return response.data;
   },
 
+  // Sends one in-app notice/reminder to this single student's portal inbox. The
+  // recipient is resolved server-side from the student id; the body only carries
+  // the message details. The `notices` route is the canonical single-recipient
+  // endpoint (the older `/notice` route is kept as an alias).
+  sendStudentNotice: async (studentId, data) => {
+    const response = await api.post(`/students/${studentId}/notices`, data);
+    return response.data;
+  },
+
+  // Resolves, server-side, who would actually receive a single-student notice:
+  // the student's own active portal account (there is no parent portal), plus
+  // the guardian contact on file for display only. The frontend must gate the
+  // send button on this value rather than on guardian contact alone.
+  getNoticeRecipient: async (studentId) => {
+    const response = await api.get(`/students/${studentId}/notice-recipient`);
+    return response.data;
+  },
+
   deleteStudent: async (studentId) => {
     const response = await api.delete(`/students/${studentId}`);
     return response.data;

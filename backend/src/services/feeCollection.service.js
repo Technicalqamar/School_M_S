@@ -11,6 +11,7 @@ import {
   NOTIFICATION_TYPES,
   NOTIFICATION_FANOUT_TARGETS,
   NOTIFICATION_CATEGORIES,
+  NOTIFICATION_SOURCES,
 } from '../constants/notification.constants.js';
 
 const CLASS_TO_FEE_CLASS = {
@@ -220,10 +221,30 @@ const collectFee = async (data) => {
     },
   });
 
+  // In-app notification for the authorized student/parent linked to this student.
+  try {
+    await notificationEngine.createNotification({
+      type: NOTIFICATION_TYPES.FEE_COLLECTED,
+      title: 'Fee collected',
+      message: `${Number(payment.amountPaid).toLocaleString('en-US')} collected for ${payment.studentName} (${payment.studentId}), ${payment.className} — ${payment.feeType} for ${payment.month || payment.exam || academicYear}. Receipt ${payment.receiptId} via ${payment.paymentMethod}.${payment.remainingAmount > 0 ? ` Balance left: ${Number(payment.remainingAmount).toLocaleString('en-US')}.` : ''}`,
+      recipient: { role: 'student', profileId: student._id },
+      dedupe: true,
+      source: NOTIFICATION_SOURCES.AUTOMATIC,
+      academicYear: payment.academicYear,
+      relatedEntity: {
+        model: 'FeeCollection',
+        id: payment._id,
+        label: payment.receiptId,
+      },
+    });
+  } catch (err) {
+    // Never break payment flow due to notification failure
+  }
+
   return payment;
 };
 
-const getFeeCollections = async ({ studentId, feeType, month, academicYear } = {}) => {
+const getFeeCollections = async ({ studentId, feeType, month, academicYear, fromDate, toDate } = {}) => {
   const filter = {};
 
   if (studentId) {
@@ -256,6 +277,37 @@ const getFeeCollections = async ({ studentId, feeType, month, academicYear } = {
     }
 
     filter.feeType = canonicalFeeType;
+  }
+
+  // Optional payment-date range. This filters the payment report by the date the
+  // payment was actually collected (`paymentDate`); it never filters by the fee's
+  // due/period month, so outstanding dues are never hidden by a payment window.
+  if (fromDate || toDate) {
+    const dateFilter = {};
+
+    if (fromDate) {
+      const from = new Date(fromDate);
+      if (Number.isNaN(from.getTime())) {
+        throw new ApiError(400, 'Invalid fromDate');
+      }
+      from.setHours(0, 0, 0, 0);
+      dateFilter.$gte = from;
+    }
+
+    if (toDate) {
+      const to = new Date(toDate);
+      if (Number.isNaN(to.getTime())) {
+        throw new ApiError(400, 'Invalid toDate');
+      }
+      to.setHours(23, 59, 59, 999);
+      dateFilter.$lte = to;
+    }
+
+    if (dateFilter.$gte && dateFilter.$lte && dateFilter.$gte > dateFilter.$lte) {
+      throw new ApiError(400, 'fromDate must be on or before toDate');
+    }
+
+    filter.paymentDate = dateFilter;
   }
 
   const payments = await FeeCollection.find({ ...filter, voucherId: null }).sort({ paymentDate: -1, createdAt: -1 });

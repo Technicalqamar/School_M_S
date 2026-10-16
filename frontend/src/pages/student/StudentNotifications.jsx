@@ -70,7 +70,14 @@ const ErrorState = ({ message, retryLabel, onRetry }) => (
   </div>
 );
 
-const StudentNotifications = () => {
+const StudentNotifications = ({
+  // Optional narrowing used by the Student Portal "Fee Reminders" area: the same
+  // page and the same inbox, restricted to the given notification types. The
+  // default (null) preserves the existing all-notifications behaviour.
+  filterTypes = null,
+  headingKey = 'notifications',
+  subtitleKey = 'studentNotificationsSubtitle',
+} = {}) => {
   const { t } = useTranslation();
 
   const [notifications, setNotifications] = useState([]);
@@ -88,6 +95,12 @@ const StudentNotifications = () => {
   const [busyId, setBusyId] = useState(null);
   const [markingAll, setMarkingAll] = useState(false);
 
+  // A primitive key rather than the array itself: an inline `filterTypes` prop
+  // would otherwise be a new reference on every render and re-trigger the fetch
+  // effect forever (the same reason `t` is deliberately kept out of the deps
+  // below).
+  const typesKey = Array.isArray(filterTypes) ? filterTypes.join(',') : '';
+
   // `t` is a fresh function on every render (useTranslation builds it inline), so
   // it must NOT appear in these dependencies: doing so would rebuild this
   // callback on every render and re-trigger the effect in an endless fetch loop.
@@ -98,21 +111,23 @@ const StudentNotifications = () => {
   // the `cancelled` guard below possible, so a response that arrives after the
   // page changed is discarded instead of overwriting the newer result.
   const fetchNotifications = useCallback(async () => {
+    const types = typesKey ? typesKey.split(',') : undefined;
     const [listResult, count, overallResult] = await Promise.all([
       studentNotificationsService.getNotifications({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         unreadOnly,
+        types,
       }),
-      studentNotificationsService.getUnreadCount(),
+      studentNotificationsService.getUnreadCount({ types }),
       // Only needed while filtering, to keep the "Total" stat truthful. Skipped
       // entirely on the normal path so the common case stays at one request.
       unreadOnly
-        ? studentNotificationsService.getNotifications({ page: 1, limit: 1 })
+        ? studentNotificationsService.getNotifications({ page: 1, limit: 1, types })
         : Promise.resolve(null),
     ]);
     return { listResult, count, overallResult };
-  }, [currentPage, unreadOnly]);
+  }, [currentPage, unreadOnly, typesKey]);
 
   const applyResult = useCallback((result) => {
     setNotifications(result.listResult.notifications);
@@ -190,7 +205,9 @@ const StudentNotifications = () => {
     if (markingAll || unreadCount === 0) return;
     setMarkingAll(true);
     try {
-      const updatedCount = await studentNotificationsService.markAllRead();
+      const updatedCount = await studentNotificationsService.markAllRead({
+        types: typesKey ? typesKey.split(',') : undefined,
+      });
       setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
       setUnreadCount((prev) => Math.max(0, prev - (updatedCount || prev.length)));
       toast.success(t('allNotificationsMarkedRead'));
@@ -225,10 +242,10 @@ const StudentNotifications = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('notifications')}
+            {t(headingKey)}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t('studentNotificationsSubtitle')}
+            {t(subtitleKey)}
           </p>
         </div>
 

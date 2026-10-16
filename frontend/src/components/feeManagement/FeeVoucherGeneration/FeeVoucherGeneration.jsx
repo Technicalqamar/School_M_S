@@ -19,6 +19,7 @@ import SelectInput from '../../common/SelectInput/SelectInput';
 import DateInput from '../../common/DateInput/DateInput';
 import feeService from '../../../services/fee/fee.service';
 import { useSchoolConfig } from '../../../contexts/SchoolConfigContext';
+import { resolveCurrentAcademicYear } from '../../../utils/academicYear';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -58,16 +59,16 @@ const toISODate = (date) => {
 
 const FeeVoucherGeneration = () => {
   const { academic } = useSchoolConfig();
-  const currentAcademicYear = (academic?.currentYear || '').trim();
+  // School Settings `currentAcademicYear`; falls back to the current calendar
+  // year (same fallback used by the backend and the other fee screens).
+  const currentAcademicYear = resolveCurrentAcademicYear(academic?.currentYear);
 
-  const academicYearOptions = useMemo(() => {
-    if (!currentAcademicYear) return [];
-    const base = Number(currentAcademicYear);
-    if (Number.isNaN(base)) return [];
-    const options = [String(base)];
-    for (let i = 1; i <= 5; i += 1) options.push(String(base - i));
-    return options;
-  }, [currentAcademicYear]);
+  // Normal voucher-generation screen: only the configured Academic Year is
+  // offered (School Settings is the source of truth — no historical/future years).
+  const academicYearOptions = useMemo(
+    () => (currentAcademicYear ? [currentAcademicYear] : []),
+    [currentAcademicYear],
+  );
 
   const now = useMemo(() => new Date(), []);
   const currentMonthIndex = now.getMonth();

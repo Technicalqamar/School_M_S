@@ -1,6 +1,10 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { hasModuleAccess, hasAnyReceptionistModuleAccess } from '../constants/receptionistPermissions';
+import {
+  hasModuleAccess,
+  hasAnyReceptionistModuleAccess,
+  RECEPTIONIST_BASE_PATH,
+} from '../constants/receptionistPermissions';
 
 // Route-level guard for the shared Admin pages.
 //
@@ -19,9 +23,13 @@ import { hasModuleAccess, hasAnyReceptionistModuleAccess } from '../constants/re
 // URL or API call can never bypass the permission model.
 const RequireModule = ({ module, page, children }) => {
   const { user, role, loading } = useAuth();
+  const { pathname } = useLocation();
+  // Keep redirects inside the namespace the user is already in: a receptionist
+  // stays under `/receptionist`, everyone else under `/admin`.
+  const base = pathname.startsWith(RECEPTIONIST_BASE_PATH) ? RECEPTIONIST_BASE_PATH : '/admin';
 
   if (loading) return null;
-  if (!user) return <Navigate to="/admin/login" replace />;
+  if (!user) return <Navigate to={`${base}/login`} replace />;
   if (role === 'admin') return children;
 
   const allowed = page
@@ -29,7 +37,7 @@ const RequireModule = ({ module, page, children }) => {
     : hasAnyReceptionistModuleAccess(user, module);
 
   if (!allowed) {
-    return <Navigate to="/admin/access-denied" replace />;
+    return <Navigate to={`${base}/access-denied`} replace />;
   }
   return children;
 };

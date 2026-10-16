@@ -121,6 +121,7 @@ const validateAcademicConfiguration = (req, res, next) => {
     teacherManualStudentAttendance,
     lateAllowed, lateGracePeriod,
     allowLeaveMarking, allowHalfDayLeave,
+    cameraQrScannerEnabled, usbQrScannerEnabled,
   } = req.body;
 
   if (currentAcademicYear !== undefined) {
@@ -240,6 +241,19 @@ const validateAcademicConfiguration = (req, res, next) => {
   if (allowHalfDayLeave !== undefined) {
     if (typeof allowHalfDayLeave !== 'boolean') {
       throw new ApiError(400, 'Allow half day leave must be a boolean');
+    }
+  }
+
+  // ─── QR Scanner Settings ────────────────────────
+  if (cameraQrScannerEnabled !== undefined) {
+    if (typeof cameraQrScannerEnabled !== 'boolean') {
+      throw new ApiError(400, 'Camera QR scanner enabled must be a boolean');
+    }
+  }
+
+  if (usbQrScannerEnabled !== undefined) {
+    if (typeof usbQrScannerEnabled !== 'boolean') {
+      throw new ApiError(400, 'USB QR scanner enabled must be a boolean');
     }
   }
 

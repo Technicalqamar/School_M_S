@@ -10,10 +10,11 @@ const DASHBOARD_ROUTES = {
   admin: '/admin',
   teacher: '/teacher/dashboard',
   student: '/student/dashboard',
-  // Receptionists now share the Admin module pages, so the landing resolver
+  // Receptionists share the Admin module pages (same components/layout), but
+  // present under their own `/receptionist` URL namespace. The landing resolver
   // (IndexRedirect) computes their first granted module from the stored
-  // permission set. '/admin' is a safe fallback for the Dashboard grant.
-  receptionist: '/admin',
+  // permission set. `/receptionist` is a safe fallback for the Dashboard grant.
+  receptionist: '/receptionist',
 };
 
 // Where a first-login portal account (created with an Admin-configured default

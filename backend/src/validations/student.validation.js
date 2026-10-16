@@ -226,4 +226,30 @@ const validateUpdateStudent = (req, res, next) => {
   next();
 };
 
-export { validateCreateStudent, validateUpdateStudent };
+const STUDENT_NOTICE_TYPES = ['General', 'Fee Reminder', 'Attendance Reminder', 'Exam Reminder'];
+
+// Validates the single-recipient student notice body. The recipient is never
+// part of the body - it comes from the route's studentId - so this only checks
+// the message details against the Notification model's own limits.
+const validateSendStudentNotice = (req, res, next) => {
+  const { title, message, type } = req.body;
+
+  if (!message || !String(message).trim()) {
+    throw new ApiError(400, 'Message is required');
+  }
+  if (String(message).trim().length > 2000) {
+    throw new ApiError(400, 'Message must not exceed 2000 characters');
+  }
+
+  if (title !== undefined && title !== null && String(title).trim().length > 200) {
+    throw new ApiError(400, 'Title must not exceed 200 characters');
+  }
+
+  if (type !== undefined && type !== null && String(type).trim() && !STUDENT_NOTICE_TYPES.includes(type)) {
+    throw new ApiError(400, `Invalid notice type. Allowed: ${STUDENT_NOTICE_TYPES.join(', ')}`);
+  }
+
+  next();
+};
+
+export { validateCreateStudent, validateUpdateStudent, validateSendStudentNotice };

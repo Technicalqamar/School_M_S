@@ -3,6 +3,7 @@ import Student from '../models/student.model.js';
 import IdCardManagement from '../models/idCardManagement.model.js';
 import SchoolSettings from '../models/schoolSettings.model.js';
 import { ApiError } from '../utils/apiError.js';
+import { assertBulkDeleteFilter } from '../utils/bulkDeleteGuard.js';
 import attendanceRules from './attendanceRules.service.js';
 import leaveService from './leave.service.js';
 
@@ -698,8 +699,17 @@ const deleteBulkAttendance = async (className, academicYear, date) => {
   }
 
   if (date) {
-    filter.date = new Date(date);
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new ApiError(400, 'Invalid attendance date');
+    }
+    filter.date = parsedDate;
   }
+
+  // Refuse to run when no usable selector survived the checks above. Without
+  // this, an empty filter would be handed straight to `deleteMany({})` and wipe
+  // every attendance record in the collection.
+  assertBulkDeleteFilter(filter, 'attendance records');
 
   const result = await StudentAttendance.deleteMany(filter);
 
