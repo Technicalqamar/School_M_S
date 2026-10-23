@@ -15,6 +15,7 @@ const OverviewTab = ({ student }) => (
     <CardSection title="Contact Information">
       <InfoRow label="Parent Phone" value={student.fatherPhone} />
       <InfoRow label="Alternate Phone" value={student.alternatePhone} />
+      <InfoRow label="Guardian WhatsApp" value={student.whatsappNumber} />
       <InfoRow label="City" value={student.city} />
       <InfoRow label="Address" value={student.address} />
       <InfoRow label="Current Status" value={student.status} />

@@ -904,6 +904,8 @@ const fr = {
   selectGender: 'Sélectionnez le genre',
   enterPhoneNumber: 'Entrez le numéro de téléphone',
   alternativePhone: 'Téléphone alternatif',
+  guardianWhatsappNumber: 'Numéro WhatsApp du tuteur',
+  enterGuardianWhatsappNumber: 'Entrez le numéro WhatsApp du tuteur',
   enterAlternativePhone: 'Entrez un autre numéro',
   enterAddress: "Entrez l'adresse",
   enterAlternatePhone: "Entrez le téléphone alternatif",

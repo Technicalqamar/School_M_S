@@ -15,6 +15,7 @@ import {
 } from '../constants/notification.constants.js';
 import userAccountService from './userAccount.service.js';
 import defaultPasswordService from './defaultPassword.service.js';
+import { normalizePakistaniMobile } from '../utils/pakistaniPhone.js';
 
 const uploadToCloudinary = (buffer, originalname) => {
   configureCloudinary();
@@ -51,6 +52,16 @@ const deleteFromCloudinary = async (publicId) => {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Store the dedicated WhatsApp contact in the canonical form used by the
+// WhatsApp layer. Invalid or empty values are left untouched so the schema
+// validator / optional-field rule remains the single source of truth.
+const normalizeWhatsAppNumber = (data) => {
+  if (!Object.prototype.hasOwnProperty.call(data, 'whatsappNumber')) return;
+
+  const normalized = normalizePakistaniMobile(data.whatsappNumber);
+  if (normalized) data.whatsappNumber = normalized;
+};
+
 const normalizeStudentIdTerm = (term) => {
   const value = String(term || '').trim().toUpperCase();
 
@@ -69,6 +80,7 @@ const createStudent = async (data, file, baseUrl = '', performedBy = null) => {
   const studentData = { ...data };
   delete studentData.studentId;
   delete studentData.admissionNumber;
+  normalizeWhatsAppNumber(studentData);
 
   const settings = await SchoolSettings.getSettings();
   studentData.academicYear = settings.currentAcademicYear;
@@ -264,6 +276,7 @@ const updateStudent = async (studentId, updateData, file, baseUrl = '') => {
       cleanData[key] = updateData[key];
     }
   }
+  normalizeWhatsAppNumber(cleanData);
 
   if (file) {
     const oldPublicId = existing.studentImagePublicId;

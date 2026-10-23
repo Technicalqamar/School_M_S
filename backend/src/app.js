@@ -25,6 +25,10 @@ import timeSlotRoutes from './routes/timeSlot.routes.js';
 import timetableEntryRoutes from './routes/timetableEntry.routes.js';
 import timetableDesignerRoutes from './routes/timetableDesigner.routes.js';
 import schoolSettingsRoutes from './routes/schoolSettings.routes.js';
+import whatsappSettingsRoutes from './routes/whatsappSettings.routes.js';
+import whatsappFeeReminderRoutes from './routes/whatsappFeeReminder.routes.js';
+import whatsappHomeworkDiaryRoutes from './routes/whatsappHomeworkDiary.routes.js';
+import whatsappWebhookRoutes from './routes/whatsappWebhook.routes.js';
 import studentAttendanceRoutes from './routes/studentAttendance.routes.js';
 import teacherAttendanceRoutes from './routes/teacherAttendance.routes.js';
 import attendanceRoutes from './routes/attendance.routes.js';
@@ -90,6 +94,14 @@ app.use(
 // Response compression
 app.use(compression());
 
+// Incoming WhatsApp webhook.
+//
+// Mounted BEFORE the JSON body parsers on purpose: signature verification
+// needs the exact raw request bytes, so the webhook router applies its own
+// scoped `express.raw()`. Mounting it here does not affect any other route,
+// which still receives the normal JSON/urlencoded parsers below.
+app.use('/api/v1/whatsapp/webhook', whatsappWebhookRoutes);
+
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -121,6 +133,10 @@ app.use('/api/v1/exam-schedules', examScheduleRoutes);
 app.use('/api/v1/admit-cards', admitCardRoutes);
 app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/school-settings', schoolSettingsRoutes);
+app.use('/api/v1/whatsapp-settings', whatsappSettingsRoutes);
+app.use('/api/v1/whatsapp/fee-reminders', whatsappFeeReminderRoutes);
+app.use('/api/v1/whatsapp/homework-diary', whatsappHomeworkDiaryRoutes);
+app.use('/api/v1/whatsapp/webhook', whatsappWebhookRoutes);
 app.use('/api/v1/time-slots', timeSlotRoutes);
 // Designer must be mounted BEFORE the /api/v1/timetable router so the
 // `/designer` path is never caught by that router's `/:id` handler.

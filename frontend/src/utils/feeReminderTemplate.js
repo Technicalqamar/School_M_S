@@ -13,8 +13,19 @@ export const FEE_REMINDER_PLACEHOLDERS = [
   '{{schoolName}}',
 ];
 
-export const DEFAULT_FEE_REMINDER_TEMPLATE =
-  'Dear {{studentName}}, your outstanding fees for {{className}} ({{feePeriod}}) total PKR {{outstanding}}. Please clear your dues at the earliest.';
+// Kept byte-for-byte in sync with the backend default template.
+export const DEFAULT_FEE_REMINDER_TEMPLATE = `Dear {{studentName}},
+
+This is a gentle reminder from {{schoolName}} regarding the outstanding fee balance on your account.
+
+Student: {{studentName}}
+Class: {{className}}
+Fee period: {{feePeriod}}
+Outstanding amount: PKR {{outstanding}}
+
+Kindly arrange to clear the outstanding dues at your earliest convenience. If you have already made the payment, please ignore this message and accept our thanks.
+
+Thank you.`;
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -35,11 +46,22 @@ export const renderFeeReminderMessage = (template, context = {}) => {
     '{{schoolName}}': context.schoolName || '',
   };
 
-  return Object.entries(replacements)
-    .reduce(
-      (acc, [token, value]) => acc.replace(new RegExp(escapeRegExp(token), 'g'), value == null ? '' : String(value)),
-      String(template),
-    )
+  const filled = Object.entries(replacements).reduce(
+    (acc, [token, value]) =>
+      acc.replace(new RegExp(escapeRegExp(token), 'g'), value == null ? '' : String(value)),
+    String(template),
+  );
+
+  // Mirrors the backend cleanup: drop lines that became empty once an
+  // unconfigured placeholder was replaced, then collapse leftover blank runs.
+  return filled
+    .split('\n')
+    .filter((line) => {
+      if (!line.includes('{{')) return true; // no placeholder -> keep verbatim
+      return line.replace(/\{\{[^}]*\}\}/g, '').trim().length > 0;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 };
 

@@ -1,4 +1,5 @@
 import { ApiError } from '../utils/apiError.js';
+import { PAK_MOBILE_REGEX, normalizePakistaniMobile } from '../utils/pakistaniPhone.js';
 
 const ALLOWED_CLASSES = [
   'Montessori', 'Nursery', 'KG 1', 'KG 2',
@@ -6,7 +7,20 @@ const ALLOWED_CLASSES = [
   'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
 ];
 
-const PAK_PHONE_REGEX = /^(\+92|0)3[0-9]{2}[-\s]?[0-9]{7}$/;
+const normalizeOptionalWhatsAppNumber = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return '';
+  if (typeof value !== 'string') {
+    throw new ApiError(400, 'Please provide a valid Pakistani mobile number for WhatsApp');
+  }
+  if (!value.trim()) return '';
+
+  const normalized = normalizePakistaniMobile(value);
+  if (!normalized) {
+    throw new ApiError(400, 'Please provide a valid Pakistani mobile number for WhatsApp');
+  }
+  return normalized;
+};
 
 const validateCreateStudent = (req, res, next) => {
   const {
@@ -16,6 +30,7 @@ const validateCreateStudent = (req, res, next) => {
     dateOfBirth,
     fatherPhone,
     alternatePhone,
+    whatsappNumber,
     city,
     address,
     admissionDate,
@@ -67,12 +82,17 @@ const validateCreateStudent = (req, res, next) => {
   if (!fatherPhone) {
     throw new ApiError(400, 'Father phone is required');
   }
-  if (!PAK_PHONE_REGEX.test(fatherPhone)) {
+  if (!PAK_MOBILE_REGEX.test(fatherPhone)) {
     throw new ApiError(400, 'Please provide a valid Pakistani mobile number');
   }
 
-  if (alternatePhone && !PAK_PHONE_REGEX.test(alternatePhone)) {
+  if (alternatePhone && !PAK_MOBILE_REGEX.test(alternatePhone)) {
     throw new ApiError(400, 'Please provide a valid Pakistani mobile number for alternate phone');
+  }
+
+  const normalizedWhatsAppNumber = normalizeOptionalWhatsAppNumber(whatsappNumber);
+  if (normalizedWhatsAppNumber !== undefined) {
+    req.body.whatsappNumber = normalizedWhatsAppNumber;
   }
 
   if (!city || !city.trim()) {
@@ -127,6 +147,7 @@ const validateUpdateStudent = (req, res, next) => {
     status,
     fatherPhone,
     alternatePhone,
+    whatsappNumber,
     city,
     address,
     class: studentClass,
@@ -182,15 +203,20 @@ const validateUpdateStudent = (req, res, next) => {
   }
 
   if (fatherPhone !== undefined) {
-    if (!PAK_PHONE_REGEX.test(fatherPhone)) {
+    if (!PAK_MOBILE_REGEX.test(fatherPhone)) {
       throw new ApiError(400, 'Please provide a valid Pakistani mobile number');
     }
   }
 
   if (alternatePhone !== undefined) {
-    if (alternatePhone && !PAK_PHONE_REGEX.test(alternatePhone)) {
+    if (alternatePhone && !PAK_MOBILE_REGEX.test(alternatePhone)) {
       throw new ApiError(400, 'Please provide a valid Pakistani mobile number for alternate phone');
     }
+  }
+
+  const normalizedWhatsAppNumber = normalizeOptionalWhatsAppNumber(whatsappNumber);
+  if (normalizedWhatsAppNumber !== undefined) {
+    req.body.whatsappNumber = normalizedWhatsAppNumber;
   }
 
   if (city !== undefined) {

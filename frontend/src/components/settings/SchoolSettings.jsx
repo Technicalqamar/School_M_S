@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import GeneralInformation from './tabs/GeneralInformation';
 import AcademicConfiguration from './tabs/AcademicConfiguration';
@@ -6,16 +6,23 @@ import BrandingDocuments from './tabs/BrandingDocuments';
 import Localization from './tabs/Localization';
 import SystemPreferences from './tabs/SystemPreferences';
 import LoginSplashScreen from './tabs/LoginSplashScreen';
+import WhatsAppSettings from './tabs/WhatsAppSettings';
 import schoolSettingsService from '../../services/schoolSettings/schoolSettings.service';
 import { useSchoolConfig } from '../../contexts/SchoolConfigContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Spinner from '../common/Spinner/Spinner';
 
+// The WhatsApp tab is Admin-only: the backend guards the whole
+// `/api/v1/whatsapp-settings` section with `authorize('admin')`, so a
+// Receptionist who holds the ordinary school-settings grant must not see (or
+// try to use) the provider credentials.
 const TABS = [
   { id: 'general', label: 'General Information' },
   { id: 'academic', label: 'Attendance Settings' },
   { id: 'branding', label: 'Branding & Documents' },
   { id: 'localization', label: 'Localization' },
   { id: 'preferences', label: 'System Preferences' },
+  { id: 'whatsapp', label: 'WhatsApp', adminOnly: true },
   { id: 'login', label: 'Login & Splash Screen' },
 ];
 
@@ -193,11 +200,22 @@ const mapApiToLogin = (api) => ({
 
 const SchoolSettings = () => {
   const { refresh } = useSchoolConfig();
-  const [activeTab, setActiveTab] = useState(TABS[0].id);
+  const { role } = useAuth();
+  const [selectedTab, setSelectedTab] = useState(TABS[0].id);
   const [apiSettings, setApiSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingField, setUploadingField] = useState(null);
+
+  // Admin-only tabs are hidden for every other role, and a tab that is no
+  // longer available falls back to the first visible one.
+  const visibleTabs = useMemo(
+    () => TABS.filter((tab) => !tab.adminOnly || role === 'admin'),
+    [role],
+  );
+  const activeTab = visibleTabs.some((tab) => tab.id === selectedTab)
+    ? selectedTab
+    : visibleTabs[0]?.id;
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -401,15 +419,15 @@ const SchoolSettings = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">School Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure global school information, academics, branding, localization, system preferences, and login screen</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure global school information, academics, branding, localization, system preferences, WhatsApp, and login screen</p>
       </div>
 
       <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setSelectedTab(tab.id)}
               className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -465,6 +483,7 @@ const SchoolSettings = () => {
               saving={saving}
             />
           )}
+          {activeTab === 'whatsapp' && <WhatsAppSettings />}
           {activeTab === 'login' && (
             <LoginSplashScreen
               data={loginData}

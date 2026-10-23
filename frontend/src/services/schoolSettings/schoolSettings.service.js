@@ -37,6 +37,23 @@ const schoolSettingsService = {
     const response = await api.put(`/school-settings/image/${field}`, formData);
     return response.data;
   },
+
+  // WhatsApp settings. The API token is write-only: it is sent once and the
+  // backend never returns it again, only a masked hint.
+  getWhatsAppSettings: async () => {
+    const response = await api.get('/whatsapp-settings/status');
+    return response.data;
+  },
+
+  saveWhatsAppToken: async (apiToken) => {
+    const response = await api.put('/whatsapp-settings/token', { apiToken });
+    return response.data;
+  },
+
+  testWhatsAppConnection: async () => {
+    const response = await api.post('/whatsapp-settings/test-connection');
+    return response.data;
+  },
 };
 
 export default schoolSettingsService;

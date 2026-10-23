@@ -969,6 +969,8 @@ const en = {
   selectGender: 'Select gender',
   enterPhoneNumber: 'Enter phone number',
   alternativePhone: 'Alternative Phone',
+  guardianWhatsappNumber: 'Guardian WhatsApp Number',
+  enterGuardianWhatsappNumber: 'Enter guardian WhatsApp number',
   enterAlternativePhone: 'Enter alternative phone',
   enterAddress: 'Enter address',
   enterAlternatePhone: 'Enter alternate phone',

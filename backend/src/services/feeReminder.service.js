@@ -73,6 +73,12 @@ const getSchoolName = async () => {
   return settings?.schoolName || '';
 };
 
+// The reminder template renders `{{schoolName}}` on its own line. When no school
+// name is configured the token must be left unreplaced so the renderer drops the
+// whole line, instead of printing a dangling sentence. Returns `{}` (so the
+// spread simply omits the key) when the school has not saved a name.
+const schoolNameContext = (schoolName) => (schoolName ? { schoolName } : {});
+
 // Builds the per-recipient context the template is rendered from. Every value
 // comes from the server: the client only supplies the template text.
 const buildRecipientContext = ({ fullName, studentId, className, outstanding, dues, schoolName }) => ({
@@ -155,7 +161,7 @@ const listFeeReminderRecipients = async ({ classNames, className, academicYear, 
       className: ref.class,
       outstanding: e.totalOutstanding || 0,
       dues: e.dues || [],
-      schoolName,
+      ...schoolNameContext(schoolName),
     });
     return {
       studentId,
@@ -179,11 +185,16 @@ const listFeeReminderRecipients = async ({ classNames, className, academicYear, 
 };
 
 // One student's live reminder context for the Single Student Fees page.
-const getStudentReminderContext = async (studentId) => {
+//
+// `academicYear` is optional so existing in-app callers keep using the current
+// academic year. WhatsApp reminders pass the year the Admin selected in the
+// recipient filter, so the preview and the final server-rendered message are
+// based on the same authoritative ledger year.
+const getStudentReminderContext = async (studentId, academicYear) => {
   const student = await Student.findOne({ studentId });
   if (!student) throw new ApiError(404, 'Student not found');
 
-  const year = await getCurrentAcademicYear();
+  const year = await resolveAcademicYear(academicYear);
   const [duesResult, schoolName] = await Promise.all([
     feeOutstandingService.getStudentOutstandingDues(student._id, year).catch(() => null),
     getSchoolName(),
@@ -202,7 +213,7 @@ const getStudentReminderContext = async (studentId) => {
     className: student.class,
     outstanding: totalOutstanding,
     dues: duesResult?.dues || [],
-    schoolName,
+    ...schoolNameContext(schoolName),
   });
 
   return {
@@ -245,7 +256,7 @@ const writeStudentReminder = async ({ student, year, messageTemplate, message, a
     className: student.class,
     outstanding: totalOutstanding,
     dues: duesResult?.dues || [],
-    schoolName: await getSchoolName(),
+    ...schoolNameContext(await getSchoolName()),
   });
 
   const finalMessage = messageTemplate

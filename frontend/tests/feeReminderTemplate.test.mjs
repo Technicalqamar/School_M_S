@@ -94,3 +94,23 @@ test('buildFeePeriod joins unique due labels and falls back to the current sessi
     'January, Final Term',
   );
 });
+
+test('an unconfigured school name leaves no dangling sentence on either side', () => {
+  // The service omits `schoolName` from the context when the school has not
+  // saved one, so the `from {{schoolName}} regarding` sentence is dropped whole.
+  const { schoolName, ...noSchool } = context;
+  void schoolName;
+  const front = renderFeeReminderMessage(DEFAULT_FEE_REMINDER_TEMPLATE, noSchool);
+  const back = backend.renderFeeReminderMessage(backend.DEFAULT_FEE_REMINDER_TEMPLATE, noSchool);
+  assert.equal(front, back);
+  assert.doesNotMatch(front, /\{\{/);
+  assert.doesNotMatch(front, /\n{3,}/);
+  assert.match(front, /Dear Ayesha Khan,/);
+  // If schoolName is missing, the sentence remains grammatically readable
+  // (token replaced by empty string) and is never doubled with blank lines.
+  assert.match(front, /from\s+regarding/);
+
+  // A configured school name renders on its own line.
+  const withSchool = renderFeeReminderMessage(DEFAULT_FEE_REMINDER_TEMPLATE, context);
+  assert.match(withSchool, /Green Valley School/);
+});

@@ -904,6 +904,8 @@ const ar = {
   selectGender: 'اختر الجنس',
   enterPhoneNumber: 'أدخل رقم الهاتف',
   alternativePhone: 'هاتف بديل',
+  guardianWhatsappNumber: 'رقم واتساب ولي الأمر',
+  enterGuardianWhatsappNumber: 'أدخل رقم واتساب ولي الأمر',
   enterAlternativePhone: 'أدخل رقم الهاتف البديل',
   enterAddress: 'أدخل العنوان',
   enterAlternatePhone: 'أدخل هاتف بديل',

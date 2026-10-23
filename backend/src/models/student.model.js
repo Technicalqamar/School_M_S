@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Counter from './counter.model.js';
+import { PAK_MOBILE_REGEX } from '../utils/pakistaniPhone.js';
 
 const VALID_CLASS_NAMES = [
   'Montessori', 'Nursery', 'KG 1', 'KG 2',
@@ -48,21 +49,38 @@ const studentSchema = new mongoose.Schema(
     fatherPhone: {
       type: String,
       required: [true, 'Father phone is required'],
+      trim: true,
       validate: {
         validator: function (v) {
-          return /^(\+92|0)3[0-9]{2}[-\s]?[0-9]{7}$/.test(v);
+          return PAK_MOBILE_REGEX.test(v);
         },
         message: 'Please provide a valid Pakistani mobile number',
       },
     },
     alternatePhone: {
       type: String,
+      trim: true,
       validate: {
         validator: function (v) {
           if (!v) return true;
-          return /^(\+92|0)3[0-9]{2}[-\s]?[0-9]{7}$/.test(v);
+          return PAK_MOBILE_REGEX.test(v);
         },
         message: 'Please provide a valid Pakistani mobile number',
+      },
+    },
+    // Optional guardian WhatsApp number. Kept separate from fatherPhone and
+    // alternatePhone so a dedicated WhatsApp contact can be stored without
+    // changing the existing call/SMS contact fields.
+    whatsappNumber: {
+      type: String,
+      default: '',
+      trim: true,
+      validate: {
+        validator: function (v) {
+          if (!v) return true;
+          return PAK_MOBILE_REGEX.test(v);
+        },
+        message: 'Please provide a valid Pakistani mobile number for WhatsApp',
       },
     },
     city: {
@@ -131,6 +149,7 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ fatherPhone: 1 });
+studentSchema.index({ whatsappNumber: 1 });
 studentSchema.index({ status: 1 });
 studentSchema.index({ class: 1 });
 studentSchema.index({ academicYear: 1 });

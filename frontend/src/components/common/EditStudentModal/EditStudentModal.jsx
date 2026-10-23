@@ -22,6 +22,7 @@ const getInitialFormData = (student) => student ? {
   academicYear: student.academicYear || '',
   fatherPhone: student.fatherPhone || '',
   alternatePhone: student.alternatePhone || '',
+  whatsappNumber: student.whatsappNumber || '',
   city: student.city || '',
   address: student.address || '',
 } : {
@@ -34,6 +35,7 @@ const getInitialFormData = (student) => student ? {
   academicYear: '',
   fatherPhone: '',
   alternatePhone: '',
+  whatsappNumber: '',
   city: '',
   address: '',
 };
@@ -78,6 +80,9 @@ const EditStudentModal = ({ student, isOpen, onClose, onSave }) => {
       if (formData.academicYear) fd.append('academicYear', formData.academicYear);
       if (formData.fatherPhone) fd.append('fatherPhone', formData.fatherPhone);
       if (formData.alternatePhone) fd.append('alternatePhone', formData.alternatePhone);
+      // Always include this optional field on edit so clearing it actually
+      // removes the stored number instead of leaving the old value in place.
+      fd.append('whatsappNumber', formData.whatsappNumber.trim());
       if (formData.city) fd.append('city', formData.city.trim());
       if (formData.address) fd.append('address', formData.address.trim());
 
@@ -148,6 +153,7 @@ const EditStudentModal = ({ student, isOpen, onClose, onSave }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
               <Input label={t('parentPhone')} name="fatherPhone" value={formData.fatherPhone} onChange={handleChange('fatherPhone')} placeholder={t('enterPhoneNumber')} />
               <Input label={t('alternativePhone')} name="alternatePhone" value={formData.alternatePhone} onChange={handleChange('alternatePhone')} placeholder={t('enterAlternativePhone')} />
+              <Input label={t('guardianWhatsappNumber')} name="whatsappNumber" value={formData.whatsappNumber} onChange={handleChange('whatsappNumber')} placeholder={t('enterGuardianWhatsappNumber')} />
               <Input label={t('city')} name="city" value={formData.city} onChange={handleChange('city')} placeholder={t('enterCity')} />
             </div>
             <div className="mb-4">

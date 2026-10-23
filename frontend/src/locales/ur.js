@@ -904,6 +904,8 @@ const ur = {
   selectGender: 'جنس منتخب کریں',
   enterPhoneNumber: 'فون نمبر درج کریں',
   alternativePhone: 'متبادل فون',
+  guardianWhatsappNumber: 'سرپرست کا واٹس ایپ نمبر',
+  enterGuardianWhatsappNumber: 'سرپرست کا واٹس ایپ نمبر درج کریں',
   enterAlternativePhone: 'متبادل فون نمبر درج کریں',
   enterAddress: 'پتہ درج کریں',
   enterAlternatePhone: 'متبادل فون درج کریں',

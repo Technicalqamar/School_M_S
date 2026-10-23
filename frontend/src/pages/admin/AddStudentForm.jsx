@@ -25,6 +25,7 @@ const getInitialState = () => ({
   class: '',
   fatherPhone: '',
   altPhone: '',
+  whatsappNumber: '',
   city: '',
   address: '',
 });
@@ -89,6 +90,9 @@ const AddStudentForm = ({ onSuccess }) => {
       formData.append('fatherPhone', form.fatherPhone);
       if (form.altPhone) {
         formData.append('alternatePhone', form.altPhone);
+      }
+      if (form.whatsappNumber.trim()) {
+        formData.append('whatsappNumber', form.whatsappNumber.trim());
       }
       formData.append('city', form.city.trim());
       formData.append('address', form.address.trim());
@@ -233,6 +237,13 @@ const AddStudentForm = ({ onSuccess }) => {
             value={form.altPhone}
             onChange={handleChange('altPhone')}
             placeholder={t('alternativePhoneNumber')}
+          />
+          <Input
+            label={t('guardianWhatsappNumber')}
+            name="whatsappNumber"
+            value={form.whatsappNumber}
+            onChange={handleChange('whatsappNumber')}
+            placeholder={t('enterGuardianWhatsappNumber')}
           />
           <Input
             label={t('city')}

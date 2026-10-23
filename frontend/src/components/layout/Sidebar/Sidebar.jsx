@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { XMarkIcon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon, ChatBubbleLeftRightIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, UserGroupIcon, AcademicCapIcon, BookOpenIcon, ClipboardDocumentListIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, Cog6ToothIcon, ChevronDownIcon, CurrencyDollarIcon, DocumentCheckIcon, UserCircleIcon, BanknotesIcon, ChatBubbleLeftRightIcon, ShieldCheckIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import useSchoolBranding from '../../../hooks/useSchoolBranding';
 import { getImageUrl } from '../../../utils/imageUrl';
 import { useTranslation } from '../../../hooks/useLocalization';
@@ -459,6 +459,31 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     <CurrencyDollarIcon className="h-5 w-5 flex-shrink-0" />
                   </NavLink>
                 )}
+              </li>
+            )}
+            {/* WhatsApp reminders can contact a real guardian, so this is a
+                standalone Admin-only page with no receptionist-grantable
+                permission. The backend enforces the same role. */}
+            {role === 'admin' && (
+              <li className="flex justify-center">
+                <NavLink
+                  to={`${base}/whatsapp`}
+                  className={({ isActive }) =>
+                    `flex items-center transition-all duration-200 rounded-lg ${
+                      isActive
+                        ? 'bg-blue-500 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400'
+                    } ${isOpen ? 'px-3 py-2.5 gap-3 w-[calc(100%-16px)]' : 'w-10 h-10 justify-center'}`
+                  }
+                  onClick={() => {
+                    if (window.innerWidth < 768) toggleSidebar();
+                  }}
+                >
+                  <DevicePhoneMobileIcon className="h-5 w-5 flex-shrink-0" />
+                  {isOpen && (
+                    <span className="text-sm font-medium">WhatsApp Reminder</span>
+                  )}
+                </NavLink>
               </li>
             )}
             {ACCOUNT_ITEMS.length > 0 && (

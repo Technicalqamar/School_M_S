@@ -74,6 +74,7 @@ import FeeReportsPage from './pages/admin/FeeManagement/Reports';
 import OutstandingDuesPage from './pages/admin/FeeManagement/OutstandingDues';
 import FeeRemindersPage from './pages/admin/FeeManagement/FeeReminders';
 import FeeVoucherGenerationPage from './pages/admin/FeeManagement/FeeVoucherGeneration';
+import WhatsAppFeeRemindersPage from './pages/admin/WhatsApp/WhatsAppFeeReminders';
 import SmsPage from './pages/admin/Communication/Sms';
 import NoticesPage from './pages/admin/Communication/Notices';
 import NotificationsPage from './pages/admin/Communication/Notifications';
@@ -284,6 +285,16 @@ function renderAdminShell(basePath) {
                 <RequireModule module="fee-management" page="voucher-generation">
                   <FeeVoucherGenerationPage />
                 </RequireModule>
+              }
+            />
+            {/* WhatsApp fee reminders are Admin-only. It is intentionally not
+                part of the receptionist-grantable fee-management module. */}
+            <Route
+              path="whatsapp"
+              element={
+                <RequireAdmin>
+                  <WhatsAppFeeRemindersPage />
+                </RequireAdmin>
               }
             />
             <Route
