@@ -43,14 +43,20 @@ const sign = (body, secret = SECRET) => computeSignature(toBuffer(body), secret)
 const headersFor = (signature) =>
   signature === undefined ? {} : { [SIGNATURE_HEADER]: signature };
 
-const createPayload = ({ id = 'msg-1', from = '923001234567', text = 'Hello from a parent' } = {}) => ({
+const createPayload = ({
+  id = 'msg-1',
+  from = '923001234567',
+  to = '923000000001',
+  text = 'Hello from a parent',
+  type = 'text',
+} = {}) => ({
   event: 'message',
-  data: {
-    id,
-    from,
-    type: 'text',
-    text: { body: text },
-  },
+  id,
+  timestamp: 1_760_000_000,
+  from,
+  to,
+  type,
+  text,
 });
 
 const bodyOf = (payload) => Buffer.from(JSON.stringify(payload));
@@ -294,7 +300,7 @@ describe('webhook delivery handling', () => {
 
   it('acknowledges an unsupported event with 2xx and ignores it', async () => {
     const service = createService();
-    const body = bodyOf({ event: 'session.status', data: { connected: true } });
+    const body = bodyOf({ event: 'session.status', id: 'status-1', timestamp: 1_760_000_000 });
 
     const result = await service.handle({ rawBody: body, headers: headersFor(sign(body)) });
 
@@ -304,7 +310,7 @@ describe('webhook delivery handling', () => {
 
   it('acknowledges a delivery without an event field as ignored', async () => {
     const service = createService();
-    const body = bodyOf({ data: { id: 'x', from: '923001234567', type: 'text', text: { body: 'hi' } } });
+    const body = bodyOf({ id: 'x', from: '923001234567', type: 'text', text: 'hi' });
 
     const result = await service.handle({ rawBody: body, headers: headersFor(sign(body)) });
 
@@ -314,11 +320,35 @@ describe('webhook delivery handling', () => {
   it('acknowledges unsupported message types and payloads as ignored', async () => {
     const service = createService();
     const cases = [
-      { event: 'message', data: { id: 'img-1', from: '923001234567', type: 'image', image: { id: 'x' } } },
-      { event: 'message', data: { id: 'loc-1', from: '923001234567', type: 'location' } },
-      { event: 'message', data: { id: 'empty-text', from: '923001234567', type: 'text', text: { body: '   ' } } },
-      { event: 'message', data: 'not-an-object' },
+      { event: 'message', id: 'img-1', from: '923001234567', type: 'image', text: 'x' },
+      { event: 'message', id: 'loc-1', from: '923001234567', type: 'location' },
+      { event: 'message', id: 'empty-text', from: '923001234567', type: 'text', text: '   ' },
+      { event: 'message', id: 'no-message-fields' },
       { event: 'message' },
+      { event: 'message', message: { id: 'x', from: '923001234567', type: 'text', text: 'hi' } },
+    ];
+
+    for (const payload of cases) {
+      const body = bodyOf(payload);
+      const result = await service.handle({ rawBody: body, headers: headersFor(sign(body)) });
+      assert.equal(result.status, 202, `expected ignored for ${JSON.stringify(payload)}`);
+      assert.equal(result.body.message, 'Webhook event ignored.');
+    }
+  });
+
+  it('acknowledges group and broadcast messages without processing them', async () => {
+    const service = createService();
+    const cases = [
+      { event: 'message', id: 'group-1', from: '120363123456789012@g.us', type: 'text', text: 'hi' },
+      {
+        event: 'message',
+        id: 'group-2',
+        from: '923001234567',
+        to: '120363123456789012@g.us',
+        type: 'text',
+        text: 'hi',
+      },
+      { event: 'message', id: 'broadcast-1', from: '923001234567', to: 'status@broadcast', type: 'text', text: 'hi' },
     ];
 
     for (const payload of cases) {
@@ -340,26 +370,51 @@ describe('webhook delivery handling', () => {
     ];
 
     for (const { id, from } of cases) {
-      const body = bodyOf({ event: 'message', data: { id, from, type: 'text', text: { body: 'hi' } } });
+      const body = bodyOf({ event: 'message', id, from, type: 'text', text: 'hi' });
       const result = await service.handle({ rawBody: body, headers: headersFor(sign(body)) });
       assert.equal(result.status, 202, `expected ignored for sender ${String(from)}`);
       assert.equal(result.body.message, 'Webhook event ignored.');
     }
   });
 
+  it('extracts the documented top-level provider fields', () => {
+    const extracted = extractIncomingTextMessage(createPayload({ id: 'top-level-1', text: '1' }));
+
+    assert.equal(extracted.ok, true);
+    assert.equal(extracted.message.sender, '923001234567');
+    assert.equal(extracted.message.text, '1');
+    assert.equal(extracted.message.providerId, 'top-level-1');
+    assert.deepEqual(Object.keys(extracted.message).sort(), ['providerId', 'sender', 'text']);
+  });
+
   it('accepts a WhatsApp JID sender and normalizes it to a phone number', () => {
     const extracted = extractIncomingTextMessage({
       event: 'message',
-      data: { id: 'jid-1', from: '923001234567:12@s.whatsapp.net', type: 'text', text: { body: 'hi' } },
+      id: 'jid-1',
+      from: '923001234567:12@s.whatsapp.net',
+      to: '923000000001',
+      type: 'text',
+      text: 'hi',
     });
 
     assert.equal(extracted.ok, true);
     assert.equal(extracted.message.sender, '923001234567');
-    // Phase 3B needs the body for menu handling, but it is never echoed or
-    // logged by the webhook layer.
+    // Menu handling needs the body, but it is never echoed or logged by the
+    // webhook layer.
     assert.equal(extracted.message.text, 'hi');
     assert.equal(extracted.message.providerId, 'jid-1');
     assert.deepEqual(Object.keys(extracted.message).sort(), ['providerId', 'sender', 'text']);
+  });
+
+  it('still accepts the previous nested data shape for compatibility', () => {
+    const extracted = extractIncomingTextMessage({
+      event: 'message',
+      data: { id: 'legacy-1', from: '923001234567', type: 'text', text: { body: 'legacy' } },
+    });
+
+    assert.equal(extracted.ok, true);
+    assert.equal(extracted.message.text, 'legacy');
+    assert.equal(extracted.message.providerId, 'legacy-1');
   });
 
   it('deduplicates a repeated provider event id', async () => {
@@ -387,12 +442,19 @@ describe('webhook delivery handling', () => {
 
   it('handles a missing provider id safely by deduplicating identical retries only', async () => {
     const service = createService();
-    const noId = { event: 'message', data: { from: '923001234567', type: 'text', text: { body: 'same text' } } };
+    const noId = {
+      event: 'message',
+      timestamp: 1_760_000_000,
+      from: '923001234567',
+      to: '923000000001',
+      type: 'text',
+      text: 'same text',
+    };
     const first = bodyOf(noId);
     const retry = Buffer.from(first); // identical bytes, as a provider retry would be
     const different = bodyOf({
-      event: 'message',
-      data: { from: '923001234567', type: 'text', text: { body: 'different text' } },
+      ...noId,
+      text: 'different text',
     });
 
     assert.equal((await service.handle({ rawBody: first, headers: headersFor(sign(first)) })).status, 200);
@@ -592,7 +654,7 @@ describe('webhook background processing', () => {
       processMessage: async (message) => processed.push(message),
     });
 
-    const unsupported = bodyOf({ event: 'status', data: { id: 'status-1' } });
+    const unsupported = bodyOf({ event: 'status', id: 'status-1' });
     const unsupportedResult = await service.handle({
       rawBody: unsupported,
       headers: headersFor(sign(unsupported)),
@@ -600,7 +662,10 @@ describe('webhook background processing', () => {
 
     const nonText = bodyOf({
       event: 'message',
-      data: { id: 'image-1', from: '923001234567', type: 'image' },
+      id: 'image-1',
+      from: '923001234567',
+      to: '923000000001',
+      type: 'image',
     });
     const nonTextResult = await service.handle({
       rawBody: nonText,

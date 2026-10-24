@@ -29,15 +29,19 @@ import { normalizePhoneNumber } from './whatsappSettings.core.js';
 //     to the assistant AFTER the acknowledgement, through a bounded queue.
 // ---------------------------------------------------------------------------
 
-// The provider's signature header. The exact spelling is taken from the task
-// specification; the provider's signing contract still has to be confirmed.
+// Provider contract: `X-Webhook-Signature: sha256=<hex HMAC-SHA256>` over the
+// exact raw request body. Bare hex is still accepted for compatibility with
+// earlier deliveries, but no signature is accepted without a valid HMAC.
 const SIGNATURE_HEADER = 'x-webhook-signature';
 const SIGNATURE_PREFIX = 'sha256=';
 const HEX_SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 
-// The provider's documented incoming-message event. Only this event is
-// interpreted; every other event is acknowledged and ignored.
+// The provider's incoming-message event. Only this event is interpreted; every
+// other event is acknowledged and ignored.
 const SUPPORTED_EVENT = 'message';
+
+// Group and broadcast JIDs must never be treated as a guardian phone number.
+const GROUP_IDENTIFIER_PATTERN = /@(?:g\.us|broadcast)$/i;
 
 // Request size guard. `express.raw` enforces the same limit at the route, this
 // check is defence in depth for direct service calls.
@@ -72,10 +76,10 @@ const readHeader = (headers, name) => {
 
 /**
  * Normalize the signature header into 64 lowercase hex characters.
- * Accepts the two standard spellings (`<hex>` and `sha256=<hex>`); anything
- * else is treated as malformed. The provider's exact format must still be
- * confirmed, but a wrong guess can only reject a delivery - it can never make
- * an unsigned message pass verification.
+ * The documented provider format is `sha256=<hex>`; bare `<hex>` is retained
+ * for compatibility. Anything else is treated as malformed. A malformed header
+ * can only reject a delivery - it can never make an unsigned message pass
+ * verification.
  */
 const normalizeSignature = (value) => {
   if (typeof value !== 'string') return '';
@@ -206,31 +210,55 @@ const resolveEventKey = (payload, rawBody) => {
   return { key: `derived:${derived}`, source: 'derived' };
 };
 
+const isGroupIdentifier = (value) =>
+  typeof value === 'string' && GROUP_IDENTIFIER_PATTERN.test(value.trim());
+
+/**
+ * Read a message field from the documented top-level shape, falling back to the
+ * older `data` object so existing callers remain compatible.
+ */
+const getMessageField = (payload, field) => {
+  if (isPlainObject(payload) && payload[field] !== undefined) return payload[field];
+  return isPlainObject(payload?.data) ? payload.data[field] : undefined;
+};
+
 /**
  * Extract the supported text-message facts from a delivery.
  *
- * Contract (provisional - see the provider questions in the Phase 3A report):
- *   { "event": "message",
- *     "data": { "id": "...", "from": "923001234567", "type": "text",
- *               "text": { "body": "..." } } }
+ * Provider contract (top-level fields):
+ *   { "event": "message", "id": "...", "timestamp": 123,
+ *     "from": "923001234567", "to": "923...", "type": "text",
+ *     "text": "Hello" }
  *
- * The message body is validated and returned for Phase 3B menu processing. It
- * is never logged, echoed in an HTTP response or used as an identity signal.
+ * `text` may also be an object with a `body` string for compatibility. Group
+ * and broadcast messages are rejected before the sender is normalized. The
+ * message body is validated and returned for menu processing; it is never
+ * logged, echoed in an HTTP response or used as an identity signal.
  */
 const extractIncomingTextMessage = (payload) => {
-  const data = payload?.data;
-  if (!isPlainObject(data)) return { ok: false, reason: 'unsupported_payload' };
+  if (!isPlainObject(payload)) return { ok: false, reason: 'unsupported_payload' };
 
-  const type = typeof data.type === 'string' ? data.type.trim().toLowerCase() : '';
+  const from = getMessageField(payload, 'from');
+  const to = getMessageField(payload, 'to');
+
+  // A group JID can look like a long numeric phone number after normalization.
+  // Reject it explicitly so a group can never be matched to a guardian.
+  if (isGroupIdentifier(from) || isGroupIdentifier(to)) {
+    return { ok: false, reason: 'group_message' };
+  }
+
+  const rawType = getMessageField(payload, 'type');
+  const type = typeof rawType === 'string' ? rawType.trim().toLowerCase() : '';
   if (type !== 'text') return { ok: false, reason: 'unsupported_message_type' };
 
+  const rawText = getMessageField(payload, 'text');
   let body = '';
-  if (isPlainObject(data.text) && typeof data.text.body === 'string') body = data.text.body;
-  else if (typeof data.text === 'string') body = data.text;
+  if (typeof rawText === 'string') body = rawText;
+  else if (isPlainObject(rawText) && typeof rawText.body === 'string') body = rawText.body;
 
-  if (!body.trim()) return { ok: false, reason: 'unsupported_message_type' };
+  if (!body.trim()) return { ok: false, reason: 'empty_message' };
 
-  const sender = normalizePhoneNumber(data.from);
+  const sender = normalizePhoneNumber(from);
   if (!sender) return { ok: false, reason: 'invalid_sender' };
 
   return { ok: true, message: { sender, text: body, providerId: readProviderId(payload) } };
@@ -357,7 +385,14 @@ const createWhatsAppWebhookService = ({
       throw new ApiError(400, 'Webhook payload is not valid JSON.');
     }
 
-    if (!isPlainObject(payload) || payload.event !== SUPPORTED_EVENT) {
+    if (!isPlainObject(payload)) {
+      return { status: 202, body: ACK_IGNORED };
+    }
+
+    // Accept the documented event spelling without making the comparison
+    // case-sensitive; all other events are acknowledged and ignored.
+    const event = typeof payload.event === 'string' ? payload.event.trim().toLowerCase() : '';
+    if (event !== SUPPORTED_EVENT) {
       return { status: 202, body: ACK_IGNORED };
     }
 
@@ -420,6 +455,7 @@ const createWhatsAppWebhookService = ({
 export {
   SIGNATURE_HEADER,
   SUPPORTED_EVENT,
+  GROUP_IDENTIFIER_PATTERN,
   MAX_BODY_BYTES,
   DEDUPE_TTL_MS,
   DEDUPE_MAX_ENTRIES,
@@ -430,6 +466,7 @@ export {
   createDedupeStore,
   readProviderId,
   resolveEventKey,
+  isGroupIdentifier,
   extractIncomingTextMessage,
   createTaskQueue,
   createWhatsAppWebhookService,

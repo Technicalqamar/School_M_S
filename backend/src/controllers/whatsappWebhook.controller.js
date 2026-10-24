@@ -25,5 +25,11 @@ const receiveWhatsAppWebhook = asyncHandler(async (req, res) => {
   return res.status(result.status).json(result.body);
 });
 
-export { receiveWhatsAppWebhook };
+// Some providers send a GET request to verify the webhook URL exists.
+// Respond quickly with a fixed 200 without processing or exposing details.
+const verifyWhatsAppWebhook = (req, res) => {
+  return res.status(200).json({ success: true, message: 'Webhook endpoint is reachable.' });
+};
+
+export { receiveWhatsAppWebhook, verifyWhatsAppWebhook };
 export default receiveWhatsAppWebhook;

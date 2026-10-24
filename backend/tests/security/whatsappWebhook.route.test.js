@@ -7,6 +7,10 @@ import { once } from 'node:events';
 import express from 'express';
 import { ApiError } from '../../src/utils/apiError.js';
 import { computeSignature } from '../../src/services/whatsapp/whatsappWebhook.core.js';
+import {
+  getPublicWebhookUrl,
+  isProcessingEnabled,
+} from '../../src/services/whatsapp/whatsappWebhook.service.js';
 import { receiveWhatsAppWebhook } from '../../src/controllers/whatsappWebhook.controller.js';
 import whatsappWebhookRoutes from '../../src/routes/whatsappWebhook.routes.js';
 
@@ -36,12 +40,12 @@ const stripComments = (source) =>
 
 const createPayload = (id = 'route-msg-1') => ({
   event: 'message',
-  data: {
-    id,
-    from: '923001234567',
-    type: 'text',
-    text: { body: 'Route level message' },
-  },
+  id,
+  timestamp: 1_760_000_000,
+  from: '923001234567',
+  to: '923000000001',
+  type: 'text',
+  text: 'Route level message',
 });
 
 const signedRequest = (payload, secret = SECRET) => {
@@ -50,7 +54,7 @@ const signedRequest = (payload, secret = SECRET) => {
     body,
     headers: {
       'content-type': 'application/json',
-      'x-webhook-signature': computeSignature(body, secret),
+      'x-webhook-signature': `sha256=${computeSignature(body, secret)}`,
     },
   };
 };
@@ -147,8 +151,79 @@ describe('webhook route wiring', () => {
     assert.match(serviceSource, /whatsappAssistantService/);
     assert.match(serviceSource, /createTaskQueue/);
     assert.match(serviceSource, /WHATSAPP_WEBHOOK_PROCESSING_ENABLED/);
+    assert.match(serviceSource, /PUBLIC_API_URL/);
     assert.doesNotMatch(serviceSource, /student\.model|models\/student/);
     assert.doesNotMatch(serviceSource, /fetch\s*\(/);
+  });
+});
+
+describe('webhook processing gate', () => {
+  const ENV_KEYS = [
+    'WHATSAPP_WEBHOOK_SECRET',
+    'PUBLIC_API_URL',
+    'WHATSAPP_WEBHOOK_PROCESSING_ENABLED',
+  ];
+  let previousEnv;
+
+  before(() => {
+    previousEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+  });
+
+  after(() => {
+    for (const key of ENV_KEYS) {
+      if (previousEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = previousEnv[key];
+    }
+  });
+
+  const setEnv = ({ secret, publicApiUrl, processing }) => {
+    if (secret === undefined) delete process.env.WHATSAPP_WEBHOOK_SECRET;
+    else process.env.WHATSAPP_WEBHOOK_SECRET = secret;
+
+    if (publicApiUrl === undefined) delete process.env.PUBLIC_API_URL;
+    else process.env.PUBLIC_API_URL = publicApiUrl;
+
+    if (processing === undefined) delete process.env.WHATSAPP_WEBHOOK_PROCESSING_ENABLED;
+    else process.env.WHATSAPP_WEBHOOK_PROCESSING_ENABLED = processing;
+  };
+
+  it('stays disabled until the secret, public URL and explicit flag are all present', () => {
+    setEnv({ secret: SECRET, publicApiUrl: undefined, processing: 'true' });
+    assert.equal(isProcessingEnabled(), false);
+
+    setEnv({ secret: SECRET, publicApiUrl: 'http://localhost:5000/api/v1', processing: 'true' });
+    assert.equal(isProcessingEnabled(), false);
+
+    setEnv({ secret: undefined, publicApiUrl: 'https://api.school.test/api/v1', processing: 'true' });
+    assert.equal(isProcessingEnabled(), false);
+
+    setEnv({ secret: SECRET, publicApiUrl: 'https://api.school.test/api/v1', processing: 'false' });
+    assert.equal(isProcessingEnabled(), false);
+
+    setEnv({ secret: SECRET, publicApiUrl: 'https://api.school.test/api/v1', processing: 'true' });
+    assert.equal(isProcessingEnabled(), true);
+  });
+
+  it('derives the public webhook URL without inventing a separate endpoint', () => {
+    setEnv({ secret: SECRET, publicApiUrl: 'https://api.school.test/api/v1///', processing: 'true' });
+
+    assert.equal(
+      getPublicWebhookUrl(),
+      'https://api.school.test/api/v1/whatsapp/webhook',
+    );
+  });
+
+  it('rejects malformed or non-API public URLs', () => {
+    for (const publicApiUrl of [
+      'not a url',
+      'ftp://api.school.test/api/v1',
+      'https://api.school.test',
+      'https://api.school.test/other',
+    ]) {
+      setEnv({ secret: SECRET, publicApiUrl, processing: 'true' });
+      assert.equal(getPublicWebhookUrl(), '', publicApiUrl);
+      assert.equal(isProcessingEnabled(), false, publicApiUrl);
+    }
   });
 });
 
@@ -267,11 +342,52 @@ describe('webhook raw-body integration (local only)', () => {
     const body = JSON.stringify(createPayload('http-valid-1'));
     const response = await post(`${baseUrl}${WEBHOOK_PATH}`, body, {
       'content-type': 'application/json',
-      'x-webhook-signature': computeSignature(Buffer.from(body), SECRET),
+      'x-webhook-signature': `sha256=${computeSignature(Buffer.from(body), SECRET)}`,
     });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { success: true, message: 'Webhook received.' });
+  });
+
+  it('acknowledges duplicate message ids idempotently', async () => {
+    const body = JSON.stringify(createPayload('http-duplicate-1'));
+    const headers = {
+      'content-type': 'application/json',
+      'x-webhook-signature': `sha256=${computeSignature(Buffer.from(body), SECRET)}`,
+    };
+
+    const first = await post(`${baseUrl}${WEBHOOK_PATH}`, body, headers);
+    const second = await post(`${baseUrl}${WEBHOOK_PATH}`, body, headers);
+
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { success: true, message: 'Webhook received.' });
+    assert.equal(second.status, 202);
+    assert.deepEqual(await second.json(), {
+      success: true,
+      message: 'Duplicate delivery ignored.',
+    });
+  });
+
+  it('ignores group messages with a 2xx acknowledgement', async () => {
+    const body = JSON.stringify({
+      event: 'message',
+      id: 'http-group-1',
+      timestamp: 1_760_000_000,
+      from: '120363123456789012@g.us',
+      to: '923000000001',
+      type: 'text',
+      text: '1',
+    });
+    const response = await post(`${baseUrl}${WEBHOOK_PATH}`, body, {
+      'content-type': 'application/json',
+      'x-webhook-signature': `sha256=${computeSignature(Buffer.from(body), SECRET)}`,
+    });
+
+    assert.equal(response.status, 202);
+    assert.deepEqual(await response.json(), {
+      success: true,
+      message: 'Webhook event ignored.',
+    });
   });
 
   it('still parses JSON normally on unrelated routes', async () => {
@@ -294,7 +410,7 @@ describe('webhook raw-body integration (local only)', () => {
 
     const response = await post(`${baseUrl}${WEBHOOK_PATH}`, pretty, {
       'content-type': 'application/json',
-      'x-webhook-signature': signatureOverMinified,
+      'x-webhook-signature': `sha256=${signatureOverMinified}`,
     });
 
     assert.equal(response.status, 401);
@@ -312,7 +428,7 @@ describe('webhook raw-body integration (local only)', () => {
     const body = '{ "event": "message", ';
     const response = await post(`${baseUrl}${WEBHOOK_PATH}`, body, {
       'content-type': 'application/json',
-      'x-webhook-signature': computeSignature(Buffer.from(body), SECRET),
+      'x-webhook-signature': `sha256=${computeSignature(Buffer.from(body), SECRET)}`,
     });
 
     assert.equal(response.status, 400);

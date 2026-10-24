@@ -265,6 +265,35 @@ const createWhatsAppAssistant = ({
       .filter(isUsableStudent)
       .slice(0, MAX_STUDENTS);
 
+    if (students.length === 0) {
+      conversations.remove(canonicalSender);
+      return startConversation(canonicalSender);
+    }
+
+    // The child list contains student names and classes, so re-check that every
+    // stored child is still linked to this sender before showing or selecting
+    // one. Data lookups are re-checked separately in handleMenu.
+    let matches;
+    try {
+      matches = await guardian.findMatches(canonicalSender);
+    } catch {
+      logger?.error?.('WhatsApp guardian verification failed.');
+      const replySent = await safeSend(canonicalSender, NOT_AVAILABLE_TEXT);
+      return { action: 'verification_failed', replySent };
+    }
+
+    const currentIds = new Set(
+      (Array.isArray(matches?.students) ? matches.students : [])
+        .filter(isUsableStudent)
+        .map((student) => String(student.id)),
+    );
+
+    if (students.some((student) => !currentIds.has(String(student.id)))) {
+      conversations.remove(canonicalSender);
+      const replySent = await safeSend(canonicalSender, PRIVACY_SAFE_TEXT);
+      return { action: 'unverified_student', replySent };
+    }
+
     const selection = parseChildSelection(body, students.length);
     if (selection === null) {
       const replySent = await safeSend(

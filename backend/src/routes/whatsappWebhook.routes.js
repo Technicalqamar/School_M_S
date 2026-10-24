@@ -1,5 +1,8 @@
 import express from 'express';
-import { receiveWhatsAppWebhook } from '../controllers/whatsappWebhook.controller.js';
+import {
+  receiveWhatsAppWebhook,
+  verifyWhatsAppWebhook,
+} from '../controllers/whatsappWebhook.controller.js';
 
 const router = express.Router();
 
@@ -14,6 +17,10 @@ const router = express.Router();
 //
 // The 256kb limit matches MAX_BODY_BYTES in the webhook core.
 const captureRawBody = express.raw({ type: () => true, limit: '256kb' });
+
+// Some providers validate webhook URLs with a GET request. Respond quickly
+// without consuming or logging the body or secrets.
+router.get('/', verifyWhatsAppWebhook);
 
 router.post('/', captureRawBody, receiveWhatsAppWebhook);
 

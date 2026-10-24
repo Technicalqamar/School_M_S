@@ -243,6 +243,22 @@ describe('child selection', () => {
     }
   });
 
+  it('re-verifies the guardian before showing the child list or selecting a child', async () => {
+    const harness = createHarness();
+    await startWith(harness, [STUDENT_A, STUDENT_B, STUDENT_C]);
+
+    // Access was revoked after the child list was shown.
+    harness.matches[SENDER] = [];
+
+    const result = await harness.incoming('1');
+
+    assert.equal(result.action, 'unverified_student');
+    assert.equal(harness.sends[1].text, PRIVACY_SAFE_TEXT);
+    assert.equal(harness.conversations.get(SENDER), null);
+    assert.deepEqual(harness.fetches, { fees: [], attendance: [], results: [] });
+    assert.ok(!harness.sends[1].text.includes('Ali'));
+  });
+
   it('keeps child numbers separate from menu numbers', async () => {
     const harness = createHarness();
     await startWith(harness, [STUDENT_A, STUDENT_B]);
@@ -426,6 +442,23 @@ describe('conversation state isolation and expiry', () => {
     assert.equal(harness.sends[1].text, PRIVACY_SAFE_TEXT);
     assert.equal(harness.conversations.get(SENDER), null);
     assert.deepEqual(harness.fetches.fees, []);
+  });
+
+  it('re-verifies the guardian before attendance and results as well', async () => {
+    for (const choice of ['2', '3']) {
+      const harness = createHarness();
+      await startWith(harness, [STUDENT_A]);
+
+      // Access was revoked after the menu was shown.
+      harness.matches[SENDER] = [];
+      const result = await harness.incoming(choice);
+
+      assert.equal(result.action, 'unverified_student', `choice ${choice}`);
+      assert.equal(harness.sends[1].text, PRIVACY_SAFE_TEXT);
+      assert.equal(harness.conversations.get(SENDER), null);
+      assert.deepEqual(harness.fetches.attendance, []);
+      assert.deepEqual(harness.fetches.results, []);
+    }
   });
 
   it('keeps the state and asks to retry when re-verification is temporarily unavailable', async () => {
