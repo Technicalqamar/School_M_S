@@ -463,7 +463,7 @@ const CollectFee = ({ onDataChange, preselectedStudent = null }) => {
                     className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
                   >
                     <p className="text-sm font-medium text-gray-900 dark:text-white">{s.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{s.id}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{s.id}</p>
                   </div>
                 ))}
               </div>
